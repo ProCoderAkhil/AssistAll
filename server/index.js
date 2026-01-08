@@ -16,23 +16,21 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = 5000;
+const PORT = process.env.PORT || 5000;
 
-// --- CONNECT DB & AUTO-CLEAN ---
+// --- 1. CONNECT DB & AUTO-CLEAN ---
 const connectDB = async () => {
     try {
         const conn = await mongoose.connect(process.env.MONGO_URI);
         console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
-
-        // 👇 AUTOMATICALLY WIPE GHOST DATA ON STARTUP 👇
+        
+        // This line wipes the database on start to prevent "Ghost Requests"
         try {
-            // This deletes the 'requests' collection to prevent old loops
             await mongoose.connection.collection('requests').drop();
-            console.log("🧹 DATABASE WIPED: All old requests deleted to prevent loops.");
+            console.log("🧹 DATABASE WIPED: Clean slate for new session.");
         } catch (e) {
             console.log("✨ Database is already clean.");
         }
-        // 👆👆👆
 
     } catch (error) {
         console.error(`❌ Connection Error: ${error.message}`);
@@ -44,33 +42,28 @@ const rootDir = path.join(__dirname, '../');
 const uploadDir = path.join(rootDir, 'uploads');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
-app.use(cors());
+// --- 2. CORS (Allows Vercel to connect) ---
+app.use(cors({
+    origin: '*', 
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 app.use(express.json());
 app.use('/uploads', express.static(uploadDir));
 
-// Debug Logger
 app.use((req, res, next) => {
     console.log(`📡 Request: ${req.method} ${req.originalUrl}`);
     next();
 });
 
-// Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/requests', rideRoutes); 
 
-const potentialDistPaths = [
-    path.join(rootDir, 'dist'),
-    path.join(rootDir, 'client', 'dist')
-];
-let distPath = potentialDistPaths.find(p => fs.existsSync(p));
-
-if (distPath) {
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => res.sendFile(path.join(distPath, 'index.html')));
-} else {
-    app.get('*', (req, res) => res.send("API Running"));
-}
+app.get('/', (req, res) => {
+    res.send("API is Running Successfully!");
+});
 
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);

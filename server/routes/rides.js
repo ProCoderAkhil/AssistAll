@@ -3,11 +3,10 @@ import Request from '../models/Request.js';
 
 const router = express.Router();
 
-// --- 1. RESET DATABASE (Manual Trigger) ---
+// --- 1. RESET DATABASE ---
 router.delete('/reset', async (req, res) => {
     try {
         await Request.deleteMany({});
-        console.log("♻️ DATABASE MANUALLY WIPED");
         res.json({ message: "Reset Successful" });
     } catch (err) { res.status(500).json({ message: "Reset Failed" }); }
 });
@@ -19,7 +18,6 @@ router.get('/', async (req, res) => {
         let query = {};
 
         if (volunteer) {
-             // Show Pending OR rides specifically assigned to this volunteer
              query = {
                  $or: [
                      { status: 'pending' },
@@ -49,7 +47,7 @@ router.post('/', async (req, res) => {
     } catch (err) { res.status(500).json({ message: "Failed" }); }
 });
 
-// --- 4. RIDE ACTIONS ---
+// --- 4. RIDE ACTIONS (Fixes Flicker) ---
 router.put('/:id/:action', async (req, res) => {
     try {
         const { action } = req.params;
