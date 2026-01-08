@@ -20,7 +20,7 @@ import AppLoader from './components/AppLoader';
 import SOSModal from './components/SOSModal'; 
 
 // SMART URL
-const DEPLOYED_API_URL = `http://${window.location.hostname}:5000`;
+const DEPLOYED_API_URL = "https://assistall-server.onrender";
 
 // MOCK NOTIFICATIONS FOR V15
 const initialNotifs = [

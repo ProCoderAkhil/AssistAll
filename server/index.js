@@ -18,16 +18,16 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// --- 1. CONNECT DB & AUTO-CLEAN ---
+// --- CONNECT DB & AUTO-CLEAN ---
 const connectDB = async () => {
     try {
         const conn = await mongoose.connect(process.env.MONGO_URI);
         console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
-        
-        // This line wipes the database on start to prevent "Ghost Requests"
+
+        // 👇 AUTO-WIPE: Clears stuck requests on server restart 👇
         try {
             await mongoose.connection.collection('requests').drop();
-            console.log("🧹 DATABASE WIPED: Clean slate for new session.");
+            console.log("🧹 DATABASE WIPED: Clean Start");
         } catch (e) {
             console.log("✨ Database is already clean.");
         }
@@ -42,7 +42,7 @@ const rootDir = path.join(__dirname, '../');
 const uploadDir = path.join(rootDir, 'uploads');
 if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
-// --- 2. CORS (Allows Vercel to connect) ---
+// --- CORS CONFIGURATION ---
 app.use(cors({
     origin: '*', 
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
@@ -52,18 +52,12 @@ app.use(cors({
 app.use(express.json());
 app.use('/uploads', express.static(uploadDir));
 
-app.use((req, res, next) => {
-    console.log(`📡 Request: ${req.method} ${req.originalUrl}`);
-    next();
-});
-
+// Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/requests', rideRoutes); 
 
-app.get('/', (req, res) => {
-    res.send("API is Running Successfully!");
-});
+app.get('/', (req, res) => res.send("API is Running Successfully!"));
 
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
