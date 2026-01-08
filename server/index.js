@@ -1,71 +1,76 @@
 import express from 'express';
-import multer from 'multer';
+import mongoose from 'mongoose';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import dotenv from 'dotenv';
+import cors from 'cors';
 
-// 1. Setup Path Variables
+import authRoutes from './routes/auth.js';
+import adminRoutes from './routes/admin.js';
+import rideRoutes from './routes/rides.js'; 
+
+dotenv.config();
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = 5000;
 
-// 2. DEBUG: Find where the 'dist' folder is
-// We check common locations: root/dist or root/client/dist
-const rootDir = path.join(__dirname, '../'); 
+// --- CONNECT DB & AUTO-CLEAN ---
+const connectDB = async () => {
+    try {
+        const conn = await mongoose.connect(process.env.MONGO_URI);
+        console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
+
+        // 👇 AUTOMATICALLY WIPE GHOST DATA ON STARTUP 👇
+        try {
+            // This deletes the 'requests' collection to prevent old loops
+            await mongoose.connection.collection('requests').drop();
+            console.log("🧹 DATABASE WIPED: All old requests deleted to prevent loops.");
+        } catch (e) {
+            console.log("✨ Database is already clean.");
+        }
+        // 👆👆👆
+
+    } catch (error) {
+        console.error(`❌ Connection Error: ${error.message}`);
+    }
+};
+connectDB();
+
+const rootDir = path.join(__dirname, '../');
+const uploadDir = path.join(rootDir, 'uploads');
+if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+
+app.use(cors());
+app.use(express.json());
+app.use('/uploads', express.static(uploadDir));
+
+// Debug Logger
+app.use((req, res, next) => {
+    console.log(`📡 Request: ${req.method} ${req.originalUrl}`);
+    next();
+});
+
+// Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/requests', rideRoutes); 
+
 const potentialDistPaths = [
     path.join(rootDir, 'dist'),
     path.join(rootDir, 'client', 'dist')
 ];
-
 let distPath = potentialDistPaths.find(p => fs.existsSync(p));
 
-// Log the result to Render Console
-if (distPath) {
-    console.log(`✅ SUCCESS: Found build folder at: ${distPath}`);
-} else {
-    console.error(`❌ ERROR: Could not find 'dist' folder! Checked:`);
-    potentialDistPaths.forEach(p => console.error(` - ${p}`));
-    // List files in root to help debugging
-    console.error("Files in root directory:", fs.readdirSync(rootDir));
-}
-
-// 3. Setup Image Uploads
-const uploadDir = path.join(rootDir, 'uploads');
-if (!fs.existsSync(uploadDir)) {
-    fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, uploadDir),
-    filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname)
-});
-const upload = multer({ storage });
-
-// 4. Serve Files
-// Serve uploaded images
-app.use('/uploads', express.static(uploadDir));
-
-// Serve React App (if found)
 if (distPath) {
     app.use(express.static(distPath));
+    app.get('*', (req, res) => res.sendFile(path.join(distPath, 'index.html')));
+} else {
+    app.get('*', (req, res) => res.send("API Running"));
 }
-
-// 5. API Routes
-app.post('/upload', upload.single('profilePic'), (req, res) => {
-    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
-    res.json({ filePath: `/uploads/${req.file.filename}` });
-});
-
-// 6. Catch-All (Send index.html for any other request)
-app.get('*', (req, res) => {
-    if (distPath) {
-        res.sendFile(path.join(distPath, 'index.html'));
-    } else {
-        res.status(500).send("Server Error: React build file (index.html) not found. Check server logs.");
-    }
-});
 
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);

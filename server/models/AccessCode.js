@@ -1,9 +1,9 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 
 const AccessCodeSchema = new mongoose.Schema({
-  code: { type: String, required: true, unique: true },
-  isUsed: { type: Boolean, default: false },
-  generatedBy: { type: String, default: 'Admin' }
-}, { timestamps: true });
+    code: { type: String, required: true },
+    isUsed: { type: Boolean, default: false },
+    createdAt: { type: Date, default: Date.now, expires: '24h' }
+});
 
-module.exports = mongoose.model('AccessCode', AccessCodeSchema);
+export default mongoose.model('AccessCode', AccessCodeSchema);

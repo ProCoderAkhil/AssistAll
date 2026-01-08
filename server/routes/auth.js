@@ -1,58 +1,101 @@
-const router = require('express').Router();
-const User = require('../models/User');
-const AccessCode = require('../models/AccessCode');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
+import express from 'express';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import User from '../models/User.js'; 
+import AccessCode from '../models/AccessCode.js'; // Ensure this file exists in models folder
 
-// REGISTER
+const router = express.Router();
+
+// --- REGISTER ROUTE ---
 router.post('/register', async (req, res) => {
   try {
     const { name, email, password, role, govtId, adminCode } = req.body;
 
-    const existingUser = await User.findOne({ email });
-    if (existingUser) return res.status(400).json("Email already exists!");
-
-    // VOLUNTEER CHECK
-    let isVerified = false;
-    if (role === 'volunteer') {
-        const validCode = await AccessCode.findOne({ code: adminCode, isUsed: false });
-        if (!validCode) {
-            return res.status(403).json("Invalid or Used Admin Code!");
-        }
-        validCode.isUsed = true; // Burn the code
-        await validCode.save();
-        isVerified = true;
+    // 1. Basic Validation
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: "Please fill in all required fields." });
     }
 
+    // 2. Check for existing user
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ message: "Email already exists!" });
+    }
+
+    // 3. VOLUNTEER & ADMIN CODE CHECK
+    let isVerified = false;
+    if (role === 'volunteer') {
+      if (!adminCode) {
+        return res.status(400).json({ message: "Admin Code is required for Volunteer registration." });
+      }
+      
+      // Check if code exists and is unused
+      const validCode = await AccessCode.findOne({ code: adminCode, isUsed: false });
+      if (!validCode) {
+        return res.status(403).json({ message: "Invalid or Used Admin Code!" });
+      }
+
+      validCode.isUsed = true; // Mark code as used
+      await validCode.save();
+      isVerified = true;
+    }
+
+    // 4. Hash Password
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
+    // 5. Create User
     const newUser = new User({
-      name, email, password: hashedPassword, role: role || 'user', govtId, isVerified
+      name,
+      email,
+      password: hashedPassword,
+      role: role || 'user',
+      govtId: govtId || null,
+      isVerified
     });
 
     const savedUser = await newUser.save();
-    res.status(201).json(savedUser);
-    
+
+    // 6. Return response (remove password)
+    const { password: savedPassword, ...userInfo } = savedUser._doc;
+    res.status(201).json(userInfo);
+
   } catch (err) {
-    res.status(500).json(err.message);
+    console.error("Register Error:", err);
+    res.status(500).json({ message: err.message });
   }
 });
 
-// LOGIN
+// --- LOGIN ROUTE ---
 router.post('/login', async (req, res) => {
   try {
+    // 1. Find User
     const user = await User.findOne({ email: req.body.email });
-    if (!user) return res.status(404).json("User not found!");
+    if (!user) {
+      return res.status(404).json({ message: "User not found!" });
+    }
 
+    // 2. Validate Password
     const validPassword = await bcrypt.compare(req.body.password, user.password);
-    if (!validPassword) return res.status(400).json("Wrong password!");
+    if (!validPassword) {
+      return res.status(400).json({ message: "Wrong password!" });
+    }
 
+    // 3. Generate JWT Token
+    const accessToken = jwt.sign(
+      { id: user._id, role: user.role, isVerified: user.isVerified },
+      process.env.JWT_SECRET || "fallback_secret_key", 
+      { expiresIn: "3d" }
+    );
+
+    // 4. Return Token + User Info
     const { password, ...others } = user._doc;
-    res.status(200).json({ ...others });
+    res.status(200).json({ ...others, accessToken });
+
   } catch (err) {
-    res.status(500).json(err);
+    console.error("Login Error:", err);
+    res.status(500).json({ message: err.message });
   }
 });
 
-module.exports = router;
+export default router;
