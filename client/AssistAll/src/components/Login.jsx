@@ -7,7 +7,7 @@ const Login = ({ onLogin, onBack, onSignupClick, onVolunteerClick }) => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // FIXED URL
+  // ⚠️ CRITICAL FIX: Ensure this points to RENDER, not localhost/vercel
   const API_URL = window.location.hostname === 'localhost' 
       ? 'http://localhost:5000' 
       : 'https://assistall-server.onrender.com'; 
@@ -32,6 +32,7 @@ const Login = ({ onLogin, onBack, onSignupClick, onVolunteerClick }) => {
         setError(data.message || 'Login failed');
       }
     } catch (err) {
+      console.error("Login Error:", err);
       setError('Connection failed. Server might be sleeping (wait 30s).');
     } finally {
       setLoading(false);
@@ -40,7 +41,7 @@ const Login = ({ onLogin, onBack, onSignupClick, onVolunteerClick }) => {
 
   return (
     <div className="min-h-screen bg-black text-white flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-[#121212] p-8 rounded-3xl border border-neutral-800 shadow-2xl animate-in slide-in-from-bottom duration-500">
+      <div className="w-full max-w-md bg-[#121212] p-8 rounded-3xl border border-neutral-800 shadow-2xl">
         <button onClick={onBack} className="mb-6 text-neutral-400 hover:text-white transition">&larr; Back</button>
         <h2 className="text-3xl font-black mb-2">Welcome Back</h2>
         <p className="text-neutral-500 mb-8">Enter your credentials to continue.</p>

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import { Menu, Bell, Shield, X } from 'lucide-react';
 
-// Import Components
+// Components
 import BottomNav from './components/BottomNav';
 import MapBackground from './components/MapBackground';
 import ServiceSelector from './components/ServiceSelector';
@@ -22,7 +22,7 @@ import LandingPage from './components/LandingPage';
 import AppLoader from './components/AppLoader'; 
 import SOSModal from './components/SOSModal'; 
 
-// FIXED URL
+// ⚠️ FIXED URL: Forces HTTPS to prevent "Mixed Content" error
 const DEPLOYED_API_URL = window.location.hostname === 'localhost' 
     ? 'http://localhost:5000' 
     : 'https://assistall-server.onrender.com';
@@ -32,7 +32,6 @@ const initialNotifs = [
 ];
 
 function App() {
-  // Safe Storage Loading
   const [user, setUser] = useState(() => {
       try {
           const saved = localStorage.getItem('user');
