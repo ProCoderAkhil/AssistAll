@@ -1,14 +1,13 @@
 import React, { useState } from 'react';
 import { Mail, Lock, ArrowRight, AlertCircle, Loader2 } from 'lucide-react';
 
-// Props passed from App.jsx: onLogin, onBack, onSignupClick
-const Login = ({ onLogin, onBack, onSignupClick }) => {
+const Login = ({ onLoginSuccess, onBack, onRegisterClick }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // --- AUTO URL ---
+  // --- SMART URL (Checks localhost vs Render) ---
   const API_URL = window.location.hostname === 'localhost' 
       ? 'http://localhost:5000' 
       : 'https://assistall-server.onrender.com'; 
@@ -28,8 +27,8 @@ const Login = ({ onLogin, onBack, onSignupClick }) => {
       const data = await res.json();
 
       if (res.ok) {
-        // Send user data back to App.jsx to handle navigation
-        onLogin(data.user, data.token);
+        // Send success back to App.jsx to handle navigation
+        onLoginSuccess(data.user, data.token);
       } else {
         setError(data.message || 'Login failed');
       }
@@ -87,7 +86,7 @@ const Login = ({ onLogin, onBack, onSignupClick }) => {
 
         <div className="mt-8 text-center">
             <p className="text-neutral-500 text-sm">Don't have an account?</p>
-            <button onClick={onSignupClick} className="text-white font-bold mt-2 hover:underline">Create Account</button>
+            <button onClick={onRegisterClick} className="text-white font-bold mt-2 hover:underline">Create Account</button>
         </div>
       </div>
     </div>
