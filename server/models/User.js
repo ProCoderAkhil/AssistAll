@@ -5,22 +5,11 @@ const UserSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
   role: { type: String, enum: ['user', 'volunteer', 'admin'], default: 'user' },
-  
-  // Verification
-  govtId: { type: String, default: '' }, 
+  phone: { type: String },
+  govtId: { type: String },
   isVerified: { type: Boolean, default: false },
+  createdAt: { type: Date, default: Date.now }
+});
 
-  // NEW: User Saved Locations
-  favorites: [{
-    name: { type: String, required: true }, // e.g., 'Home', 'Work'
-    address: { type: String, required: true }
-  }],
-  
-  needs: {
-    wheelchair: { type: Boolean, default: false },
-    visual: { type: Boolean, default: false },
-    hearing: { type: Boolean, default: false },
-  }
-}, { timestamps: true });
-
-export default mongoose.model('User', UserSchema);
+const User = mongoose.model('User', UserSchema);
+export default User;
