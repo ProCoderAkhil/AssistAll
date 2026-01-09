@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { Routes, Route, useNavigate } from 'react-router-dom';
 import { Menu, Bell, Shield, X } from 'lucide-react';
 
 // Import Components
@@ -33,7 +33,18 @@ const initialNotifs = [
 ];
 
 function App() {
-  const [user, setUser] = useState(JSON.parse(localStorage.getItem('user')) || null);
+  // --- CRASH FIX: Safe LocalStorage Loading ---
+  const [user, setUser] = useState(() => {
+      try {
+          const savedUser = localStorage.getItem('user');
+          return savedUser ? JSON.parse(savedUser) : null;
+      } catch (e) {
+          console.error("Storage Error:", e);
+          localStorage.clear(); // Clear corrupt data
+          return null;
+      }
+  });
+
   const [isLoading, setIsLoading] = useState(true);
   
   // V15 FEATURES
@@ -85,7 +96,6 @@ function App() {
       localStorage.setItem('token', token);
       setUser(userData);
       
-      // Navigate based on Role
       if(userData.role === 'volunteer') navigate('/volunteer');
       else if(userData.role === 'admin') navigate('/admin');
       else navigate('/home');
@@ -117,7 +127,6 @@ function App() {
     } catch (err) { showToast("Network Error", "error"); setStep('selecting'); }
   };
 
-  // NOTIFICATION OVERLAY
   const NotificationOverlay = () => (
       <div className="absolute inset-0 z-[60] bg-black/90 backdrop-blur-md animate-in slide-in-from-right duration-300">
           <div className="p-6 pt-12">
@@ -150,7 +159,6 @@ function App() {
       </div>
 
       <Routes>
-        {/* PUBLIC ROUTES */}
         <Route path="/" element={<LandingPage onGetStarted={() => navigate('/login')} onVolunteerJoin={() => navigate('/volunteer-register')} />} />
         
         <Route path="/login" element={
