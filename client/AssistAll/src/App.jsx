@@ -6,7 +6,7 @@ import ServiceSelector from './components/ServiceSelector';
 import FindingVolunteer from './components/FindingVolunteer';
 import VolunteerFound from './components/VolunteerFound';
 import RideInProgress from './components/RideInProgress';
-import Login from './pages/Login'; // Changed from components to pages
+import Login from './components/Login';
 import UserProfile from './components/UserProfile';
 import VolunteerDashboard from './components/VolunteerDashboard';
 import ActivityHistory from './components/ActivityHistory';
@@ -18,6 +18,7 @@ import Toast from './components/Toast';
 import LandingPage from './components/LandingPage'; 
 import AppLoader from './components/AppLoader'; 
 import SOSModal from './components/SOSModal'; 
+import Register from './components/UserSignup';
 
 // SMART URL
 const DEPLOYED_API_URL = window.location.hostname === 'localhost' 
