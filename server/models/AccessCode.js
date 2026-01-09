@@ -1,9 +1,10 @@
 import mongoose from 'mongoose';
 
 const AccessCodeSchema = new mongoose.Schema({
-    code: { type: String, required: true },
+    code: { type: String, required: true, unique: true },
     isUsed: { type: Boolean, default: false },
-    createdAt: { type: Date, default: Date.now, expires: '24h' }
+    createdAt: { type: Date, default: Date.now }
 });
 
-export default mongoose.model('AccessCode', AccessCodeSchema);
+const AccessCode = mongoose.model('AccessCode', AccessCodeSchema);
+export default AccessCode;
