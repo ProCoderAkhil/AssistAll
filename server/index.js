@@ -22,7 +22,6 @@ const connectDB = async () => {
     try {
         const conn = await mongoose.connect(process.env.MONGO_URI);
         console.log(`✅ MongoDB Connected: ${conn.connection.host}`);
-        try { await mongoose.connection.collection('requests').drop(); } catch(e) {}
     } catch (error) { console.error(`❌ Error: ${error.message}`); }
 };
 connectDB();
@@ -35,6 +34,7 @@ app.use(cors({ origin: '*', methods: ['GET', 'POST', 'PUT', 'DELETE'], allowedHe
 app.use(express.json());
 app.use('/uploads', express.static(uploadDir));
 
+// MOUNT ROUTES
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/requests', rideRoutes); 
