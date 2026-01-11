@@ -22,7 +22,7 @@ const initialBazaar = [
   { id: 3, title: "Bike Service", desc: "20% Off", price: "Claim", color: "text-blue-400 bg-blue-900/20 border-blue-800", icon: Wrench, type: 'action' },
 ];
 
-const VolunteerDashboard = ({ user }) => {
+const VolunteerDashboard = ({ user, globalToast }) => {
   if (!user) return <div className="h-screen bg-[#050505] text-white flex items-center justify-center font-sans"><Loader2 className="animate-spin mr-3 text-blue-500"/> <span className="tracking-widest text-xs font-bold">LOADING SYSTEM...</span></div>;
 
   const [activeTab, setActiveTab] = useState('feed'); 
@@ -31,7 +31,6 @@ const VolunteerDashboard = ({ user }) => {
   const [financials, setFinancials] = useState({ total: 1250, base: 1000, tips: 250, jobs: 4 }); 
   const [isOnline, setIsOnline] = useState(false);
   const [showOfflineModal, setShowOfflineModal] = useState(false);
-  const [showHeatmap, setShowHeatmap] = useState(false);
   const [onlineTime, setOnlineTime] = useState(0);
   const [toast, setToast] = useState(null);
   
@@ -39,67 +38,72 @@ const VolunteerDashboard = ({ user }) => {
   const [gigsList, setGigsList] = useState(initialGigs);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
 
-  const DEPLOYED_API_URL = "https://assistall-server.onrender.com";
+  // ⚠️ FIXED URL: Connects to Render properly
+  const DEPLOYED_API_URL = window.location.hostname === 'localhost' 
+      ? 'http://localhost:5000' 
+      : 'https://assistall-server.onrender.com';
 
   const showToast = (msg, type) => { setToast({msg, type}); setTimeout(() => setToast(null), 3000); };
-  const formatTime = (s) => { const h = Math.floor(s / 3600); const m = Math.floor((s % 3600) / 60); return `${h}h ${m}m`; };
   const getGoalProgress = () => Math.min((financials.total / GOAL_DAILY) * 100, 100);
 
   // --- API ---
   const fetchRequests = async () => { 
     if (!isOnline) return; 
     try { 
-      const res = await fetch(`${DEPLOYED_API_URL}/api/requests?volunteer=${user.name}`); 
+      const res = await fetch(`${DEPLOYED_API_URL}/api/requests`); 
       if (res.ok) { 
           const data = await res.json(); 
           if(Array.isArray(data)) { 
-            const myActive = data.find(r => r.volunteerName === user.name && (r.status === 'accepted' || r.status === 'in_progress')); 
+            // 1. Check if I have an active job
+            const myActive = data.find(r => r.volunteerId === user._id && (r.status === 'accepted' || r.status === 'in_progress')); 
             
-            // OPTIMISTIC SYNC: Only update if server has something new, don't overwrite if local state is ahead
             if (myActive) {
                 setActiveJob(myActive);
-            } else if (activeJob && activeJob.status === 'completed') {
+                setRequests([]); // Clear feed if busy
+            } else {
+                // 2. If no active job, show pending requests
                 setActiveJob(null);
-            }
-
-            if (!myActive) {
                 const pending = data.filter(r => r.status === 'pending');
                 setRequests(pending);
-                setActiveJob(null);
-            } else {
-                setRequests([]);
             }
           } 
       } 
     } catch (err) {} 
   };
   
-  useEffect(() => { fetchRequests(); const interval = setInterval(fetchRequests, 3000); return () => clearInterval(interval); }, [isOnline]);
-  useEffect(() => { let timer; if (isOnline) timer = setInterval(() => setOnlineTime(p => p + 1), 1000); return () => clearInterval(timer); }, [isOnline]);
+  useEffect(() => { 
+      fetchRequests(); 
+      const interval = setInterval(fetchRequests, 5000); // Polling every 5s
+      return () => clearInterval(interval); 
+  }, [isOnline]);
 
   const handleAction = async (id, action) => {
     try {
-        if (action === 'pickup') {
+        let endpoint = '';
+        let body = { volunteerId: user._id, volunteerName: user.name };
+
+        if (action === 'accept') {
+            endpoint = `/api/requests/${id}/accept`;
+            showToast("Ride Accepted!", "success");
+        } else if (action === 'pickup') {
+            endpoint = `/api/requests/${id}/status`;
+            body.status = 'in_progress';
             showToast("Trip Started!", "success");
-            // FORCE LOCAL UPDATE IMMEDIATELY (Prevents Flicker)
             setActiveJob(prev => ({ ...prev, status: 'in_progress' })); 
-        }
-        else if (action === 'accept') {
-            showToast("Accepted!", "success");
-        }
-        else if (action === 'complete') {
+        } else if (action === 'complete') {
+            endpoint = `/api/requests/${id}/status`;
+            body.status = 'completed';
             showToast("Ride Completed!", "success");
             setActiveJob(null);
             setFinancials(prev => ({ ...prev, total: prev.total + 150, jobs: prev.jobs + 1 }));
         }
 
-        await fetch(`${DEPLOYED_API_URL}/api/requests/${id}/${action}`, { 
+        await fetch(`${DEPLOYED_API_URL}${endpoint}`, { 
             method: 'PUT', 
             headers: { "Content-Type": "application/json" }, 
-            body: JSON.stringify({ volunteerName: user.name, volunteerId: user._id })
+            body: JSON.stringify(body)
         });
 
-        // Delay next fetch to allow DB to update
         setTimeout(fetchRequests, 1000);
 
     } catch(e) { showToast("Network Error", "error"); }
@@ -116,11 +120,12 @@ const VolunteerDashboard = ({ user }) => {
       showToast("Benefit Activated!", "success");
   };
 
-  const toggleGigReminder = (id) => {
-      setGigsList(prev => prev.map(g => g.id === id ? { ...g, reminder: !g.reminder } : g));
-      showToast("Schedule Updated", "info");
+  const safeLogout = () => {
+      localStorage.clear();
+      window.location.href = "/"; 
   };
 
+  // --- VIEWS ---
   const OfflineModal = () => (
     <div className="fixed inset-0 bg-black/90 z-[200] flex items-end justify-center animate-in fade-in duration-300 backdrop-blur-sm">
       <div className="bg-[#121212] w-full max-w-md rounded-t-[32px] p-8 border-t border-[#333] animate-in slide-in-from-bottom">
@@ -181,7 +186,7 @@ const VolunteerDashboard = ({ user }) => {
                     {activeJob.status === 'accepted' ? (
                         <button onClick={() => handleAction(activeJob._id, 'pickup')} className="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl text-lg shadow-lg hover:bg-blue-700 active:scale-[0.98] transition-all flex justify-center items-center gap-2">Slide to Pickup <ArrowRight size={20}/></button>
                     ) : (
-                        <button onClick={() => handleAction(activeJob._id, 'complete')} className="w-full bg-red-600 text-white font-bold py-4 rounded-2xl text-lg shadow-lg hover:bg-red-700 active:scale-[0.98] transition-all flex justify-center items-center gap-2">Complete Ride <CheckCircle size={20}/></button>
+                        <button onClick={() => handleAction(activeJob._id, 'complete')} className="w-full bg-green-600 text-white font-bold py-4 rounded-2xl text-lg shadow-lg hover:bg-green-700 active:scale-[0.98] transition-all flex justify-center items-center gap-2">Complete Ride <CheckCircle size={20}/></button>
                     )}
                 </div>
             )}
@@ -190,7 +195,7 @@ const VolunteerDashboard = ({ user }) => {
             {!activeJob && requests.map(req => (
                 <div key={req._id} className="absolute bottom-24 left-4 right-4 bg-[#121212] text-white p-6 rounded-[32px] shadow-2xl border border-white/10 z-20 animate-in slide-in-from-bottom duration-300">
                     <div className="flex justify-between items-center mb-4"><div className="bg-green-500/10 text-green-400 px-3 py-1 rounded-lg text-[10px] font-black uppercase border border-green-500/20 flex items-center gap-1"><Zap size={12} fill="currentColor"/> High Pay</div><span className="text-neutral-400 text-xs font-bold">Nearby</span></div>
-                    <div className="flex justify-between items-end mb-6"><div><p className="text-neutral-500 text-[10px] uppercase font-bold mb-1 tracking-wider">PASSENGER</p><h3 className="text-2xl font-bold">{req.requesterName}</h3></div><div className="text-right"><p className="text-3xl font-black text-white">₹{req.price}</p><p className="text-neutral-500 text-[10px] uppercase font-bold tracking-wider">ESTIMATED</p></div></div>
+                    <div className="flex justify-between items-end mb-6"><div><p className="text-neutral-500 text-[10px] uppercase font-bold mb-1 tracking-wider">PASSENGER</p><h3 className="text-2xl font-bold">{req.requesterName}</h3></div><div className="text-right"><p className="text-3xl font-black text-white">₹150</p><p className="text-neutral-500 text-[10px] uppercase font-bold tracking-wider">ESTIMATED</p></div></div>
                     <button onClick={() => handleAction(req._id, 'accept')} className="w-full bg-white text-black font-black py-4 rounded-2xl text-lg shadow-[0_0_30px_rgba(255,255,255,0.2)] active:scale-[0.98] transition-all hover:bg-gray-200">Tap to Accept</button>
                 </div>
             ))}
@@ -215,7 +220,7 @@ const VolunteerDashboard = ({ user }) => {
         <div className="bg-gradient-to-r from-purple-900/40 to-indigo-900/40 rounded-[32px] p-6 relative overflow-hidden border border-purple-500/20 mb-8">
             <div className="relative z-10"><div className="flex items-center gap-2 mb-3"><span className="bg-white/10 text-white text-[10px] font-black px-2 py-1 rounded backdrop-blur uppercase tracking-wider border border-white/10">3 DAY STREAK</span></div><h2 className="text-2xl font-black text-white mb-2">Complete 3 Rides</h2><p className="text-purple-200 text-sm mb-6 font-medium">Finish 3 more trips by 10 PM to unlock <span className="text-white font-bold">₹200 Bonus</span>.</p><div className="w-full bg-black/30 h-2 rounded-full overflow-hidden"><div className="bg-purple-400 w-1/3 h-full rounded-full shadow-[0_0_15px_rgba(192,132,252,0.5)]"></div></div></div><Zap size={100} className="absolute -right-6 -bottom-6 text-purple-500/10 rotate-12"/>
         </div>
-        <div className="space-y-3">{gigsList.map((item) => (<div key={item.id} onClick={() => toggleGigReminder(item.id)} className={`flex items-center justify-between p-4 rounded-2xl border transition-all cursor-pointer active:scale-[0.98] ${item.status === 'locked' ? 'bg-[#121212] border-white/5 opacity-50' : 'bg-[#1a1a1a] border-white/10 hover:border-white/20'}`}><div className="flex items-center gap-4"><div className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold text-sm ${item.isSpecial ? 'bg-green-600 text-black shadow-lg shadow-green-900/20' : 'bg-[#222] text-neutral-400'}`}>{item.date}</div><div><p className="text-white font-bold text-lg">{item.day}</p><p className="text-neutral-500 text-xs font-bold uppercase tracking-wide">{item.status}</p></div></div>{item.earnings ? <div className="text-right"><p className="text-green-400 font-black">{item.earnings}</p><p className="text-[10px] text-neutral-500 uppercase font-bold">Est.</p></div> : <Bell size={20} className={item.reminder ? "text-blue-500 fill-current" : "text-neutral-700"}/>}</div>))}</div>
+        <div className="space-y-3">{gigsList.map((item) => (<div key={item.id} className={`flex items-center justify-between p-4 rounded-2xl border transition-all cursor-pointer active:scale-[0.98] ${item.status === 'locked' ? 'bg-[#121212] border-white/5 opacity-50' : 'bg-[#1a1a1a] border-white/10 hover:border-white/20'}`}><div className="flex items-center gap-4"><div className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold text-sm ${item.isSpecial ? 'bg-green-600 text-black shadow-lg shadow-green-900/20' : 'bg-[#222] text-neutral-400'}`}>{item.date}</div><div><p className="text-white font-bold text-lg">{item.day}</p><p className="text-neutral-500 text-xs font-bold uppercase tracking-wide">{item.status}</p></div></div>{item.earnings ? <div className="text-right"><p className="text-green-400 font-black">{item.earnings}</p><p className="text-[10px] text-neutral-500 uppercase font-bold">Est.</p></div> : <Bell size={20} className={item.reminder ? "text-blue-500 fill-current" : "text-neutral-700"}/>}</div>))}</div>
     </div>
   );
 
@@ -229,7 +234,7 @@ const VolunteerDashboard = ({ user }) => {
   const ProfileView = () => (
     <div className="p-6 pt-24 h-full bg-[#050505] animate-in slide-in-from-left overflow-y-auto pb-32">
         <div className="flex items-center mb-8 bg-[#121212] p-6 rounded-[32px] border border-white/5 relative overflow-hidden"><div className="w-20 h-20 bg-gradient-to-tr from-green-500 to-emerald-600 rounded-full flex items-center justify-center text-3xl font-black mr-5 text-black border-4 border-[#121212] relative z-10">{user.name.charAt(0).toUpperCase()}</div><div className="relative z-10"><h2 className="text-2xl font-black text-white tracking-tight">{user.name}</h2></div></div>
-        <button onClick={() => window.location.reload()} className="w-full bg-[#1a1a1a] text-red-500 border border-red-900/30 font-bold py-4 rounded-2xl hover:bg-red-900/10 transition active:scale-[0.98] flex items-center justify-center gap-2"><LogOut size={20}/> Sign Out</button>
+        <button onClick={safeLogout} className="w-full bg-[#1a1a1a] text-red-500 border border-red-900/30 font-bold py-4 rounded-2xl hover:bg-red-900/10 transition active:scale-[0.98] flex items-center justify-center gap-2"><LogOut size={20}/> Sign Out</button>
     </div>
   );
 
