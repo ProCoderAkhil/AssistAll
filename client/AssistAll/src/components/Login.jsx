@@ -7,6 +7,7 @@ const Login = ({ onLogin, onBack, onSignupClick, onVolunteerClick }) => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // FIXED URL
   const API_URL = window.location.hostname === 'localhost' 
       ? 'http://localhost:5000' 
       : 'https://assistall-server.onrender.com'; 
@@ -20,21 +21,24 @@ const Login = ({ onLogin, onBack, onSignupClick, onVolunteerClick }) => {
       const res = await fetch(`${API_URL}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // Lowercase the email to match backend
-        body: JSON.stringify({ email: email.toLowerCase(), password })
+        // ⚠️ CRITICAL FIX: Trim spaces before sending
+        body: JSON.stringify({ 
+            email: email.trim(), 
+            password: password.trim() 
+        })
       });
 
       const data = await res.json();
 
       if (res.ok) {
-        // Accepts user AND token
-        onLogin(data.user, data.token);
+        onLogin(data.user || data, data.token || data.accessToken);
       } else {
         setError(data.message || 'Login failed');
       }
     } catch (err) {
       console.error(err);
-      setError('Connection failed. Server might be sleeping.');
+      // Explicit message about the Render Free Tier delay
+      setError('Connection failed. Server is waking up... Please try again in 30 seconds.');
     } finally {
       setLoading(false);
     }
@@ -42,18 +46,51 @@ const Login = ({ onLogin, onBack, onSignupClick, onVolunteerClick }) => {
 
   return (
     <div className="min-h-screen bg-black text-white flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-[#121212] p-8 rounded-3xl border border-neutral-800 shadow-2xl">
+      <div className="w-full max-w-md bg-[#121212] p-8 rounded-3xl border border-neutral-800 shadow-2xl animate-in slide-in-from-bottom duration-500">
         <button onClick={onBack} className="mb-6 text-neutral-400 hover:text-white transition">&larr; Back</button>
         <h2 className="text-3xl font-black mb-2">Welcome Back</h2>
-        {error && <div className="bg-red-900/20 text-red-400 p-4 rounded-xl mb-6 flex gap-3 text-sm font-bold"><AlertCircle size={18} />{error}</div>}
+        <p className="text-neutral-500 mb-8">Enter your credentials to continue.</p>
+
+        {error && (
+            <div className="bg-red-900/20 border border-red-500/50 text-red-400 p-4 rounded-xl mb-6 flex items-center gap-3 text-sm font-bold">
+                <AlertCircle size={24} /> 
+                <span>{error}</span>
+            </div>
+        )}
+
         <form onSubmit={handleLogin} className="space-y-4">
-          <div className="relative group"><Mail className="absolute left-4 top-4 text-neutral-500" size={20} /><input type="email" placeholder="Email Address" className="w-full bg-[#1a1a1a] border border-neutral-800 rounded-2xl py-4 pl-12 text-white" value={email} onChange={(e) => setEmail(e.target.value)} required /></div>
-          <div className="relative group"><Lock className="absolute left-4 top-4 text-neutral-500" size={20} /><input type="password" placeholder="Password" className="w-full bg-[#1a1a1a] border border-neutral-800 rounded-2xl py-4 pl-12 text-white" value={password} onChange={(e) => setPassword(e.target.value)} required /></div>
-          <button type="submit" disabled={loading} className="w-full bg-white text-black font-bold py-4 rounded-2xl mt-4 flex justify-center gap-2">{loading ? <Loader2 className="animate-spin" /> : <>Sign In <ArrowRight size={20} /></>}</button>
+          <div className="relative group">
+            <Mail className="absolute left-4 top-4 text-neutral-500" size={20} />
+            <input 
+              type="email" placeholder="Email Address" 
+              className="w-full bg-[#1a1a1a] border border-neutral-800 rounded-2xl py-4 pl-12 text-white" 
+              value={email} onChange={(e) => setEmail(e.target.value)} required 
+            />
+          </div>
+          <div className="relative group">
+            <Lock className="absolute left-4 top-4 text-neutral-500" size={20} />
+            <input 
+              type="password" placeholder="Password" 
+              className="w-full bg-[#1a1a1a] border border-neutral-800 rounded-2xl py-4 pl-12 text-white" 
+              value={password} onChange={(e) => setPassword(e.target.value)} required 
+            />
+          </div>
+          <button type="submit" disabled={loading} className="w-full bg-white text-black font-bold py-4 rounded-2xl mt-4 flex justify-center gap-2">
+            {loading ? <Loader2 className="animate-spin" /> : <>Sign In <ArrowRight size={20} /></>}
+          </button>
         </form>
-        <div className="mt-8 text-center"><p className="text-neutral-500 text-sm">Don't have an account?</p><div className="flex justify-center gap-4 mt-2"><button onClick={onSignupClick} className="text-white font-bold hover:underline">User Signup</button><span className="text-neutral-600">|</span><button onClick={onVolunteerClick} className="text-green-500 font-bold hover:underline">Volunteer</button></div></div>
+
+        <div className="mt-8 text-center">
+            <p className="text-neutral-500 text-sm">Don't have an account?</p>
+            <div className="flex justify-center gap-4 mt-2">
+                <button onClick={onSignupClick} className="text-white font-bold hover:underline">User Signup</button>
+                <span className="text-neutral-600">|</span>
+                <button onClick={onVolunteerClick} className="text-green-500 font-bold hover:underline">Volunteer</button>
+            </div>
+        </div>
       </div>
     </div>
   );
 };
+
 export default Login;

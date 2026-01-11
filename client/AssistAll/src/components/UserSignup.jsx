@@ -19,19 +19,24 @@ const UserSignup = ({ onRegister, onBack }) => {
       const res = await fetch(`${API_URL}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...formData, email: formData.email.toLowerCase() })
+        // ⚠️ CRITICAL FIX: Trim inputs before creating account
+        body: JSON.stringify({ 
+            ...formData, 
+            name: formData.name.trim(),
+            email: formData.email.trim(),
+            password: formData.password.trim() 
+        })
       });
 
       const data = await res.json();
 
       if (res.ok) {
-        // Pass both User and Token
-        onRegister(data.user, data.token);
+        onRegister(data.user || data, data.token);
       } else {
         setError(data.message || 'Registration failed');
       }
     } catch (err) {
-      setError('Connection failed. Please try again.');
+      setError('Connection failed. Server might be sleeping.');
     } finally {
       setLoading(false);
     }
@@ -43,6 +48,7 @@ const UserSignup = ({ onRegister, onBack }) => {
         <button onClick={onBack} className="mb-6 text-neutral-400 hover:text-white transition">&larr; Back</button>
         <h2 className="text-3xl font-black mb-2">Join AssistAll</h2>
         {error && <div className="bg-red-900/20 text-red-400 p-4 rounded-xl mb-6 flex gap-3 text-sm font-bold"><AlertCircle size={18} />{error}</div>}
+        
         <form onSubmit={handleRegister} className="space-y-4">
           <div className="relative group"><User className="absolute left-4 top-4 text-neutral-500" size={20} /><input type="text" placeholder="Full Name" className="w-full bg-[#1a1a1a] border border-neutral-800 rounded-2xl py-4 pl-12 text-white" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} required /></div>
           <div className="relative group"><Mail className="absolute left-4 top-4 text-neutral-500" size={20} /><input type="email" placeholder="Email Address" className="w-full bg-[#1a1a1a] border border-neutral-800 rounded-2xl py-4 pl-12 text-white" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} required /></div>

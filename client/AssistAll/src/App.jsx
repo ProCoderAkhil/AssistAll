@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, useNavigate } from 'react-router-dom';
+import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import { Menu, Bell, Shield, X } from 'lucide-react';
 
 // Components
@@ -22,7 +22,7 @@ import LandingPage from './components/LandingPage';
 import AppLoader from './components/AppLoader'; 
 import SOSModal from './components/SOSModal'; 
 
-// ⚠️ FIXED URL: Forces HTTPS to prevent "Mixed Content" error
+// FIXED URL
 const DEPLOYED_API_URL = window.location.hostname === 'localhost' 
     ? 'http://localhost:5000' 
     : 'https://assistall-server.onrender.com';
@@ -32,14 +32,17 @@ const initialNotifs = [
 ];
 
 function App() {
-  // CRASH FIX: Safe LocalStorage Loading
+  // ⚠️ PERSISTENT LOGIN LOGIC
   const [user, setUser] = useState(() => {
       try {
-          const saved = localStorage.getItem('user');
-          if (!saved || saved === "undefined") return null;
-          return JSON.parse(saved);
+          // Check Local Storage immediately on app launch
+          const savedUser = localStorage.getItem('user');
+          const savedToken = localStorage.getItem('token');
+          if (savedUser && savedUser !== "undefined" && savedToken) {
+              return JSON.parse(savedUser);
+          }
+          return null;
       } catch (e) { 
-          console.error("Storage corrupt, clearing...");
           localStorage.clear(); 
           return null; 
       }
@@ -51,11 +54,21 @@ function App() {
   const [acceptedRequestData, setAcceptedRequestData] = useState(null);
   const [showSOS, setShowSOS] = useState(false);
   const [toast, setToast] = useState(null); 
-
   const navigate = useNavigate();
+  const location = useLocation();
+
   const showToast = (msg, type = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 4000); };
 
-  useEffect(() => { setTimeout(() => setIsLoading(false), 1500); }, []);
+  // ⚠️ AUTO-REDIRECT: If logged in, don't show login page
+  useEffect(() => { 
+      setTimeout(() => setIsLoading(false), 1000);
+      
+      if (user && (location.pathname === '/login' || location.pathname === '/' || location.pathname === '/register')) {
+          if (user.role === 'admin') navigate('/admin');
+          else if (user.role === 'volunteer') navigate('/volunteer');
+          else navigate('/home');
+      }
+  }, [user, location.pathname]);
 
   // Polling for Updates
   useEffect(() => {
@@ -86,13 +99,16 @@ function App() {
       localStorage.setItem('token', token);
       setUser(userData);
       
-      // Auto Redirect based on Role
       if(userData.role === 'volunteer') navigate('/volunteer');
       else if(userData.role === 'admin') navigate('/admin');
       else navigate('/home');
   };
 
-  const handleLogout = () => { localStorage.clear(); setUser(null); navigate('/'); };
+  const handleLogout = () => { 
+      localStorage.clear(); 
+      setUser(null); 
+      navigate('/'); 
+  };
 
   const handleFindVolunteer = async (bookingDetails) => { 
     setStep('searching'); 
@@ -120,9 +136,10 @@ function App() {
       <Routes>
         <Route path="/" element={<LandingPage onGetStarted={() => navigate('/login')} onVolunteerJoin={() => navigate('/volunteer-register')} />} />
         <Route path="/login" element={<Login onLogin={handleLoginSuccess} onBack={() => navigate('/')} onSignupClick={() => navigate('/register')} onVolunteerClick={() => navigate('/volunteer-register')} />} />
-        <Route path="/register" element={<UserSignup onRegister={(u) => handleLoginSuccess(u, 'token')} onBack={() => navigate('/')} />} />
-        <Route path="/volunteer-register" element={<VolunteerSignup onRegister={(u) => handleLoginSuccess(u, 'token')} onBack={() => navigate('/')} />} />
+        <Route path="/register" element={<UserSignup onRegister={(u, t) => handleLoginSuccess(u, t)} onBack={() => navigate('/')} />} />
+        <Route path="/volunteer-register" element={<VolunteerSignup onRegister={(u, t) => handleLoginSuccess(u, t)} onBack={() => navigate('/')} />} />
 
+        {/* PROTECTED ROUTES */}
         <Route path="/home" element={user ? (
             <>
                 <div className="absolute inset-0 z-0"><MapBackground activeRequest={acceptedRequestData} /></div>

@@ -16,9 +16,12 @@ const AdminPanel = ({ onLogout }) => {
   const [isSidebarOpen, setSidebarOpen] = useState(true);
   const [godMode, setGodMode] = useState(false); 
   const [generatedCode, setGeneratedCode] = useState("------"); 
-  const [notifications, setNotifications] = useState([]); // New Notification State
+  const [notifications, setNotifications] = useState([]); 
 
-  const DEPLOYED_API_URL = `http://${window.location.hostname}:5000`;
+  // ⚠️ FIXED URL: Connects to Render properly
+  const DEPLOYED_API_URL = window.location.hostname === 'localhost' 
+      ? 'http://localhost:5000' 
+      : 'https://assistall-server.onrender.com';
 
   // --- NOTIFICATION SYSTEM ---
   const addNotification = (message, type = 'info') => {
@@ -34,7 +37,13 @@ const AdminPanel = ({ onLogout }) => {
         const resStats = await fetch(`${DEPLOYED_API_URL}/api/admin/stats`);
         if(resStats.ok) setStats(await resStats.json());
 
-        // Always fetch these if on their respective tabs
+        // Load active code on startup
+        const resCode = await fetch(`${DEPLOYED_API_URL}/api/admin/code`);
+        if(resCode.ok) {
+            const data = await resCode.json();
+            if(data.code) setGeneratedCode(data.code);
+        }
+
         if (activeTab === 'volunteers') {
             const resVol = await fetch(`${DEPLOYED_API_URL}/api/admin/volunteers`);
             if(resVol.ok) setVolunteers(await resVol.json());
@@ -44,8 +53,7 @@ const AdminPanel = ({ onLogout }) => {
             if(resRides.ok) setAllRides(await resRides.json());
         }
     } catch (error) { 
-        console.error("Data Sync Error"); 
-        // No alert here to prevent spamming, maybe a silent log
+        // Silent fail for smooth UX
     }
   };
 
@@ -64,7 +72,10 @@ const AdminPanel = ({ onLogout }) => {
 
   const generateCode = async () => {
     try {
-        const res = await fetch(`${DEPLOYED_API_URL}/api/admin/generate-code`, { method: 'POST' });
+        const res = await fetch(`${DEPLOYED_API_URL}/api/admin/generate-code`, { 
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
         const data = await res.json();
         if (res.ok) {
             setGeneratedCode(data.code);
@@ -89,14 +100,17 @@ const AdminPanel = ({ onLogout }) => {
       } catch(e) { addNotification("Network Error", "error"); }
   };
 
-  const handleGodAction = (action) => {
+  const handleGodAction = async (action) => {
       if(!godMode) return addNotification("Enable God Mode first!", "error");
       if(confirm(`⚠️ GOD MODE: Are you sure you want to ${action}?`)) {
+          if (action === 'Reset Database') {
+             await fetch(`${DEPLOYED_API_URL}/api/requests/reset`, { method: 'DELETE' });
+          }
           addNotification(`${action} Executed Successfully`, "success");
       }
   };
 
-  // --- VIEWS ---
+  // --- COMPONENTS ---
 
   const StatCard = ({ label, value, icon: Icon, color, trend }) => (
       <div className="bg-neutral-900/50 backdrop-blur-md p-6 rounded-2xl border border-neutral-800 relative overflow-hidden group hover:border-neutral-700 transition-all duration-300">
@@ -163,24 +177,14 @@ const AdminPanel = ({ onLogout }) => {
         <div className="overflow-x-auto">
             <table className="w-full text-left">
                 <thead className="bg-black text-neutral-400 text-xs uppercase font-bold">
-                    <tr>
-                        <th className="p-4">Profile</th>
-                        <th className="p-4">Contact</th>
-                        <th className="p-4">Verification</th>
-                        <th className="p-4 text-right">Actions</th>
-                    </tr>
+                    <tr><th className="p-4">Profile</th><th className="p-4">Contact</th><th className="p-4">Verification</th><th className="p-4 text-right">Actions</th></tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-800">
                     {volunteers.map(vol => (
                         <tr key={vol._id} className="hover:bg-white/5 transition group">
                             <td className="p-4 font-bold text-white flex items-center gap-3">
-                                <div className="w-10 h-10 bg-gradient-to-br from-neutral-700 to-neutral-800 rounded-full flex items-center justify-center text-sm font-bold border border-neutral-700">
-                                    {vol.name.charAt(0)}
-                                </div>
-                                <div>
-                                    <p>{vol.name}</p>
-                                    <p className="text-[10px] font-normal text-neutral-500 font-mono">ID: {vol.govtId || 'N/A'}</p>
-                                </div>
+                                <div className="w-10 h-10 bg-gradient-to-br from-neutral-700 to-neutral-800 rounded-full flex items-center justify-center text-sm font-bold border border-neutral-700">{vol.name.charAt(0)}</div>
+                                <div><p>{vol.name}</p><p className="text-[10px] font-normal text-neutral-500 font-mono">ID: {vol.govtId || 'N/A'}</p></div>
                             </td>
                             <td className="p-4 text-neutral-400 text-sm">{vol.email}</td>
                             <td className="p-4">
@@ -193,9 +197,7 @@ const AdminPanel = ({ onLogout }) => {
                                 <button onClick={() => toggleVerification(vol._id)} className={`p-2 rounded-lg transition ${vol.isVerified ? 'bg-red-500/10 text-red-500 hover:bg-red-500/20' : 'bg-green-500/10 text-green-500 hover:bg-green-500/20'}`}>
                                     {vol.isVerified ? <XCircle size={18}/> : <CheckCircle size={18}/>}
                                 </button>
-                                <button onClick={() => handleGodAction('Ban User')} className="p-2 rounded-lg bg-neutral-800 text-neutral-400 hover:text-white hover:bg-neutral-700">
-                                    <MoreVertical size={18}/>
-                                </button>
+                                <button onClick={() => handleGodAction('Ban User')} className="p-2 rounded-lg bg-neutral-800 text-neutral-400 hover:text-white hover:bg-neutral-700"><MoreVertical size={18}/></button>
                             </td>
                         </tr>
                     ))}
@@ -253,13 +255,7 @@ const AdminPanel = ({ onLogout }) => {
         </div>
         <table className="w-full text-left text-neutral-300">
             <thead className="bg-black text-neutral-500 text-xs uppercase font-bold">
-                <tr>
-                    <th className="p-4">Requester</th>
-                    <th className="p-4">Volunteer</th>
-                    <th className="p-4">Type</th>
-                    <th className="p-4">Time</th>
-                    <th className="p-4">Status</th>
-                </tr>
+                <tr><th className="p-4">Requester</th><th className="p-4">Volunteer</th><th className="p-4">Type</th><th className="p-4">Time</th><th className="p-4">Status</th></tr>
             </thead>
             <tbody className="divide-y divide-neutral-800">
                 {allRides.map(r => (
@@ -297,41 +293,25 @@ const AdminPanel = ({ onLogout }) => {
       <div className={`fixed inset-y-0 left-0 z-30 w-72 bg-neutral-900 border-r border-neutral-800 transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0`}>
         <div className="flex flex-col h-full p-6">
             <div className="flex items-center mb-10 px-2">
-                <div className="w-10 h-10 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center mr-3 shadow-lg shadow-blue-900/40">
-                    <Shield size={24} className="text-white"/>
-                </div>
-                <div>
-                    <h1 className="text-xl font-black text-white tracking-tight">AssistAll</h1>
-                    <p className="text-[10px] text-blue-500 font-bold uppercase tracking-widest">Admin Pro v10</p>
-                </div>
+                <div className="w-10 h-10 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center mr-3 shadow-lg shadow-blue-900/40"><Shield size={24} className="text-white"/></div>
+                <div><h1 className="text-xl font-black text-white tracking-tight">AssistAll</h1><p className="text-[10px] text-blue-500 font-bold uppercase tracking-widest">Admin Pro v10</p></div>
             </div>
             <nav className="flex-grow space-y-1">
                 <p className="px-4 text-[10px] font-bold text-neutral-500 uppercase tracking-widest mb-3 mt-4">Main Menu</p>
                 {['dashboard', 'volunteers', 'rides', 'settings'].map(t => (
                     <button key={t} onClick={() => setActiveTab(t)} className={`w-full flex items-center p-3 rounded-xl font-medium transition-all duration-200 capitalize ${activeTab===t?'bg-blue-600 text-white shadow-lg shadow-blue-900/20':'text-neutral-400 hover:bg-neutral-800 hover:text-white'}`}>
-                        {t === 'dashboard' ? <LayoutDashboard size={20} className="mr-3"/> : 
-                         t === 'volunteers' ? <Users size={20} className="mr-3"/> :
-                         t === 'rides' ? <Car size={20} className="mr-3"/> :
-                         <Settings size={20} className="mr-3"/>} 
-                        {t}
+                        {t === 'dashboard' ? <LayoutDashboard size={20} className="mr-3"/> : t === 'volunteers' ? <Users size={20} className="mr-3"/> : t === 'rides' ? <Car size={20} className="mr-3"/> : <Settings size={20} className="mr-3"/>} {t}
                     </button>
                 ))}
             </nav>
-            <button onClick={onLogout} className="flex items-center text-red-500 font-bold mt-auto p-4 hover:bg-red-900/10 rounded-xl transition border border-transparent hover:border-red-900/30 group">
-                <LogOut size={20} className="mr-3 group-hover:-translate-x-1 transition-transform"/> Sign Out
-            </button>
+            <button onClick={onLogout} className="flex items-center text-red-500 font-bold mt-auto p-4 hover:bg-red-900/10 rounded-xl transition border border-transparent hover:border-red-900/30 group"><LogOut size={20} className="mr-3 group-hover:-translate-x-1 transition-transform"/> Sign Out</button>
         </div>
       </div>
       <div className="flex-1 flex flex-col h-screen overflow-hidden">
           <header className="bg-neutral-900/50 backdrop-blur-md border-b border-neutral-800 p-6 flex justify-between items-center z-20">
-              <div className="flex items-center">
-                  <button className="lg:hidden mr-4 text-neutral-400" onClick={() => setSidebarOpen(!isSidebarOpen)}><Menu/></button>
-                  <h1 className="text-2xl font-bold text-white capitalize tracking-tight">{activeTab}</h1>
-              </div>
+              <div className="flex items-center"><button className="lg:hidden mr-4 text-neutral-400" onClick={() => setSidebarOpen(!isSidebarOpen)}><Menu/></button><h1 className="text-2xl font-bold text-white capitalize tracking-tight">{activeTab}</h1></div>
               <div className="flex items-center gap-4">
-                  <div className="hidden md:flex items-center bg-black px-4 py-2 rounded-full border border-neutral-800 text-xs font-bold text-neutral-400 gap-2">
-                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div> SYSTEM ONLINE
-                  </div>
+                  <div className="hidden md:flex items-center bg-black px-4 py-2 rounded-full border border-neutral-800 text-xs font-bold text-neutral-400 gap-2"><div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div> SYSTEM ONLINE</div>
                   <div className="w-10 h-10 bg-gradient-to-tr from-blue-600 to-purple-600 rounded-full flex items-center justify-center font-bold text-white shadow-lg border-2 border-neutral-800">A</div>
               </div>
           </header>
