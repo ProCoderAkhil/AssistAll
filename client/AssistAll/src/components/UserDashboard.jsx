@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   MapPin, Navigation, Phone, Search, User, Shield, Menu, Car, Heart, Zap, 
   ShoppingBag, ArrowLeft, ArrowRight, Trash2, CreditCard, Star, CheckCircle, 
-  Clock, Map, Bell, Loader2
+  Clock, Map, Bell, X
 } from 'lucide-react';
 
 const UserDashboard = () => {
@@ -10,7 +10,10 @@ const UserDashboard = () => {
   const [selectedService, setSelectedService] = useState(null);
   const [rideId, setRideId] = useState(null); 
   const [volunteerDetails, setVolunteerDetails] = useState(null);
-  const [rideStatus, setRideStatus] = useState(null); // New: Tracks 'accepted' vs 'in_progress'
+  const [rideStatus, setRideStatus] = useState(null); 
+  
+  // Modals
+  const [showPickupModal, setShowPickupModal] = useState(false);
   
   // Payment States
   const [tip, setTip] = useState(0);
@@ -22,9 +25,9 @@ const UserDashboard = () => {
       : 'https://assistall-server.onrender.com';
 
   const pollingInterval = useRef(null);
+  const lastStatusRef = useRef(null); // ⚠️ KEY FIX: Remembers last status to prevent loops
 
-  // --- 1. ROBUST POLLING ENGINE ---
-  // This effect runs ONLY when rideId changes. It handles all status transitions internally.
+  // --- 1. ROBUST POLLING ENGINE (ANTI-LOOP) ---
   useEffect(() => {
     if (!rideId) return;
 
@@ -37,37 +40,43 @@ const UserDashboard = () => {
         const myRide = allRides.find(r => r._id === rideId);
 
         if (myRide) {
-          console.log("Ride Status:", myRide.status); // Debugging
-
-          // 1. VOLUNTEER ACCEPTED
-          if (myRide.status === 'accepted') {
-             setRideStatus('accepted');
-             setVolunteerDetails({ name: myRide.volunteerName || "Volunteer" });
-             // Only switch step if not already there to prevent loop
-             setStep((prev) => prev !== 'found' ? 'found' : prev);
-          }
+          const currentStatus = myRide.status;
           
-          // 2. RIDE IN PROGRESS (Slide to Pickup)
-          else if (myRide.status === 'in_progress') {
-             setRideStatus('in_progress');
-             setVolunteerDetails({ name: myRide.volunteerName || "Volunteer" });
-             setStep((prev) => prev !== 'found' ? 'found' : prev); // Stay on 'found' screen but UI changes
-          }
+          // ⚠️ LOOP FIX: Only update if status CHANGED
+          if (currentStatus !== lastStatusRef.current) {
+              console.log(`Status Changed: ${lastStatusRef.current} -> ${currentStatus}`);
+              lastStatusRef.current = currentStatus; // Update Ref
+              setRideStatus(currentStatus);
 
-          // 3. RIDE COMPLETED
-          else if (myRide.status === 'completed') {
-             setRideStatus('completed');
-             setStep('completed');
-             stopPolling(); // Stop checking once complete
+              // 1. VOLUNTEER FOUND
+              if (currentStatus === 'accepted') {
+                 setVolunteerDetails({ name: myRide.volunteerName || "Volunteer" });
+                 setStep('found');
+                 navigator.vibrate?.([200, 100, 200]);
+              }
+              
+              // 2. PICKED UP (Show Popup)
+              else if (currentStatus === 'in_progress') {
+                 setVolunteerDetails({ name: myRide.volunteerName || "Volunteer" });
+                 setStep('found'); 
+                 setShowPickupModal(true); // TRIGGER POPUP
+                 navigator.vibrate?.(500);
+              }
+
+              // 3. COMPLETED (Show Rating)
+              else if (currentStatus === 'completed') {
+                 setStep('completed');
+                 stopPolling(); 
+                 navigator.vibrate?.([100, 50, 100, 50, 100]);
+              }
           }
         }
       } catch (err) { console.error("Polling Error:", err); }
     };
 
     // Start Polling
-    pollingInterval.current = setInterval(pollRideStatus, 2000); // Check every 2 seconds
+    pollingInterval.current = setInterval(pollRideStatus, 2000); 
 
-    // Cleanup function
     return () => stopPolling();
   }, [rideId]);
 
@@ -78,14 +87,7 @@ const UserDashboard = () => {
       }
   };
 
-  // --- 2. HAPTIC FEEDBACK ---
-  useEffect(() => {
-      if (rideStatus === 'accepted') navigator.vibrate?.([200, 100, 200]);
-      if (rideStatus === 'in_progress') navigator.vibrate?.(500);
-      if (rideStatus === 'completed') navigator.vibrate?.([100, 50, 100, 50, 100]);
-  }, [rideStatus]);
-
-  // --- 3. PAYMENT HANDLER ---
+  // --- 2. PAYMENT HANDLER ---
   const loadRazorpayScript = (src) => {
     return new Promise((resolve) => {
       const script = document.createElement('script');
@@ -106,18 +108,16 @@ const UserDashboard = () => {
     const res = await loadRazorpayScript('https://checkout.razorpay.com/v1/checkout.js');
 
     if (!res) {
-      alert('Razorpay SDK failed to load. Check internet.');
+      alert('Razorpay SDK failed to load.');
       return;
     }
 
-    const totalAmount = 150 + tip;
-
     const options = {
       key: "rzp_test_S1HtYIQWxqe96O", 
-      amount: totalAmount * 100, 
+      amount: (150 + tip) * 100, 
       currency: "INR",
       name: "AssistAll Payment",
-      description: `Ride Fare + Tip`,
+      description: `Ride Fare`,
       image: "https://cdn-icons-png.flaticon.com/512/1041/1041888.png",
       handler: function (response) {
         alert(`Payment Successful! ID: ${response.razorpay_payment_id}`);
@@ -138,6 +138,7 @@ const UserDashboard = () => {
       setStep('menu'); 
       setRideId(null); 
       setRideStatus(null);
+      lastStatusRef.current = null;
       setSelectedService(null);
       stopPolling();
   };
@@ -154,10 +155,24 @@ const UserDashboard = () => {
         setRideId(data._id);
         setStep('searching'); 
       } else {
-          alert("Request Failed. Is server running?");
+          alert("Request Failed.");
       }
     } catch (e) { alert("Connection Failed."); }
   };
+
+  // --- MODALS ---
+  const PickupModal = () => (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white w-[90%] max-w-sm p-6 rounded-3xl text-center shadow-2xl animate-in zoom-in">
+              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Car size={32} className="text-blue-600"/>
+              </div>
+              <h2 className="text-2xl font-black mb-2">Volunteer Picked You Up!</h2>
+              <p className="text-gray-500 mb-6">Heading to your destination.</p>
+              <button onClick={() => setShowPickupModal(false)} className="w-full bg-blue-600 text-white font-bold py-3 rounded-xl">Okay, Let's Go!</button>
+          </div>
+      </div>
+  );
 
   return (
     <div className="h-screen bg-neutral-100 text-black font-sans flex flex-col relative overflow-hidden">
@@ -227,13 +242,12 @@ const UserDashboard = () => {
           </div>
       )}
 
-      {/* --- STEP 4: FOUND / IN PROGRESS (Dynamic) --- */}
+      {/* --- STEP 4: FOUND / IN PROGRESS --- */}
       {step === 'found' && (
           <div className="absolute bottom-4 left-4 right-4 z-20 bg-[#121212] border border-white/10 p-6 rounded-[32px] shadow-2xl text-white animate-in slide-in-from-bottom duration-500">
-              {/* Dynamic Badge Status */}
               <div className={`absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg flex items-center gap-2 ${rideStatus === 'in_progress' ? 'bg-green-600 shadow-green-900/50' : 'bg-blue-600 shadow-blue-900/50'}`}>
                   {rideStatus === 'in_progress' ? <Navigation size={10} fill="currentColor"/> : <Bell size={10} fill="currentColor"/>}
-                  {rideStatus === 'in_progress' ? "RIDE IN PROGRESS" : "VOLUNTEER ARRIVING"}
+                  {rideStatus === 'in_progress' ? "HEADING TO DROP" : "VOLUNTEER ARRIVING"}
               </div>
 
               <div className="flex justify-between items-start mb-6 mt-2">
@@ -259,7 +273,7 @@ const UserDashboard = () => {
 
       {/* --- STEP 5: COMPLETED --- */}
       {step === 'completed' && (
-          <div className="flex-1 bg-white flex flex-col items-center justify-center p-6 animate-in zoom-in duration-500 relative z-50">
+          <div className="fixed inset-0 z-50 bg-white flex flex-col items-center justify-center p-6 animate-in slide-in-from-bottom duration-500">
               <div className="bg-green-50 p-8 rounded-full shadow-xl mb-6 border border-green-100 animate-bounce">
                   <CheckCircle size={64} className="text-green-500"/>
               </div>
@@ -268,6 +282,15 @@ const UserDashboard = () => {
               
               <div className="flex gap-2 mb-10">
                   {[1,2,3,4,5].map(i => <Star key={i} size={36} className="text-yellow-400 fill-current drop-shadow-md cursor-pointer hover:scale-110 transition"/>)}
+              </div>
+
+              <div className="w-full max-w-md mb-10">
+                  <p className="text-xs font-black text-neutral-400 uppercase tracking-widest mb-4 text-center">ADD A TIP</p>
+                  <div className="grid grid-cols-4 gap-3">
+                      {[0, 20, 50, 100].map(amount => (
+                          <button key={amount} onClick={() => setTip(amount)} className={`py-4 rounded-2xl font-bold border-2 transition active:scale-95 ${tip === amount ? 'bg-black text-white border-black shadow-xl' : 'bg-white text-black border-gray-100 hover:border-gray-300'}`}>{amount === 0 ? 'No' : `₹${amount}`}</button>
+                      ))}
+                  </div>
               </div>
 
               <div className="w-full max-w-md bg-gray-50 p-2 rounded-2xl border border-gray-200 flex mb-8">
@@ -281,6 +304,8 @@ const UserDashboard = () => {
               <button onClick={() => window.location.reload()} className="mt-6 text-gray-400 font-bold text-xs uppercase tracking-widest hover:text-black transition">Skip Rating</button>
           </div>
       )}
+
+      {showPickupModal && <PickupModal />}
     </div>
   );
 };
