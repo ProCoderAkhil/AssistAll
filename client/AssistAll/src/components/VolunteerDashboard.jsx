@@ -40,11 +40,10 @@ const VolunteerDashboard = ({ user, globalToast }) => {
 
   const [activeTab, setActiveTab] = useState('feed'); 
   const [requests, setRequests] = useState([]);
-  const [activeJob, setActiveJob] = useState(null);
+  const [activeJob, setActiveJob] = useState(null); // CRITICAL STATE
   const [financials, setFinancials] = useState({ total: 1250, base: 1000, tips: 250, jobs: 4 }); 
   const [isOnline, setIsOnline] = useState(false);
   const [showOfflineModal, setShowOfflineModal] = useState(false);
-  const [onlineTime, setOnlineTime] = useState(0);
   const [toast, setToast] = useState(null);
   
   const [bazaarList, setBazaarList] = useState(initialBazaar);
@@ -62,13 +61,15 @@ const VolunteerDashboard = ({ user, globalToast }) => {
       if (res.ok) { 
           const data = await res.json(); 
           if(Array.isArray(data)) { 
+            // 1. CRITICAL FIX: Check if *I* have an accepted/in-progress job FIRST
             const myActive = data.find(r => r.volunteerId === user._id && (r.status === 'accepted' || r.status === 'in_progress')); 
             
             if (myActive) {
-                setActiveJob(myActive);
-                setRequests([]); 
+                setActiveJob(myActive); // Force UI to show Job Card
+                setRequests([]);        // Hide other requests
             } else {
-                setActiveJob(null);
+                setActiveJob(null);     // Show Scanning
+                // Filter only PENDING requests that are NOT completed
                 const pending = data.filter(r => r.status === 'pending');
                 setRequests(pending);
             }
@@ -79,7 +80,7 @@ const VolunteerDashboard = ({ user, globalToast }) => {
   
   useEffect(() => { 
       fetchRequests(); 
-      const interval = setInterval(fetchRequests, 5000); 
+      const interval = setInterval(fetchRequests, 3000); // Faster Polling (3s)
       return () => clearInterval(interval); 
   }, [isOnline]);
 
@@ -88,31 +89,43 @@ const VolunteerDashboard = ({ user, globalToast }) => {
         let endpoint = '';
         let body = { volunteerId: user._id, volunteerName: user.name };
 
+        // 1. OPTIMISTIC UI UPDATE (Instant Feedback)
         if (action === 'accept') {
+            // Find request data locally first to show immediately
+            const req = requests.find(r => r._id === id);
+            if(req) setActiveJob({ ...req, status: 'accepted' });
+            
             endpoint = `/api/requests/${id}/accept`;
             showToast("Ride Accepted!", "success");
-        } else if (action === 'pickup') {
+        } 
+        else if (action === 'pickup') {
+            setActiveJob(prev => ({ ...prev, status: 'in_progress' })); 
             endpoint = `/api/requests/${id}/status`;
             body.status = 'in_progress';
             showToast("Trip Started!", "success");
-            setActiveJob(prev => ({ ...prev, status: 'in_progress' })); 
-        } else if (action === 'complete') {
+        } 
+        else if (action === 'complete') {
+            setActiveJob(null); // Clear job immediately
+            setFinancials(prev => ({ ...prev, total: prev.total + 150, jobs: prev.jobs + 1 }));
             endpoint = `/api/requests/${id}/status`;
             body.status = 'completed';
             showToast("Ride Completed!", "success");
-            setActiveJob(null);
-            setFinancials(prev => ({ ...prev, total: prev.total + 150, jobs: prev.jobs + 1 }));
         }
 
+        // 2. SEND TO SERVER
         await fetch(`${DEPLOYED_API_URL}${endpoint}`, { 
             method: 'PUT', 
             headers: { "Content-Type": "application/json" }, 
             body: JSON.stringify(body)
         });
 
+        // 3. RE-SYNC
         setTimeout(fetchRequests, 1000);
 
-    } catch(e) { showToast("Network Error", "error"); }
+    } catch(e) { 
+        showToast("Network Error", "error"); 
+        fetchRequests(); // Revert on error
+    }
   };
 
   const handleWithdraw = () => {
@@ -131,8 +144,7 @@ const VolunteerDashboard = ({ user, globalToast }) => {
       window.location.href = "/"; 
   };
 
-  // --- V30 VIEWS ---
-
+  // --- VIEWS ---
   const OfflineModal = () => (
     <div className="fixed inset-0 bg-black/90 z-[200] flex items-end justify-center animate-in fade-in duration-300 backdrop-blur-sm">
       <div className="bg-[#121212] w-full max-w-md rounded-t-[32px] p-8 border-t border-[#333] animate-in slide-in-from-bottom">
@@ -174,7 +186,7 @@ const VolunteerDashboard = ({ user, globalToast }) => {
                 </div>
             </div>
 
-            {/* SCANNING */}
+            {/* SCANNING (Only if NO active job) */}
             {!activeJob && requests.length === 0 && (
                 <div className="absolute bottom-40 left-1/2 -translate-x-1/2 bg-[#0a0a0a]/80 backdrop-blur-md px-8 py-4 rounded-full shadow-2xl flex items-center gap-4 border border-white/10 z-10 whitespace-nowrap animate-in fade-in zoom-in">
                     <div className="relative"><div className="w-3 h-3 bg-blue-500 rounded-full animate-ping absolute top-0 left-0"></div><div className="w-3 h-3 bg-blue-500 rounded-full relative z-10"></div></div>
@@ -182,7 +194,7 @@ const VolunteerDashboard = ({ user, globalToast }) => {
                 </div>
             )}
             
-            {/* ACTIVE JOB CARD */}
+            {/* ACTIVE JOB CARD (Shows immediately after accepting) */}
             {activeJob && (
                 <div className="absolute bottom-24 left-4 right-4 bg-white rounded-[32px] shadow-[0_20px_60px_rgba(0,0,0,0.8)] p-6 z-20 border-t-4 border-blue-600 animate-in slide-in-from-bottom duration-500">
                     <div className="flex justify-between items-center mb-6">
@@ -198,7 +210,7 @@ const VolunteerDashboard = ({ user, globalToast }) => {
                 </div>
             )}
             
-            {/* INCOMING REQUESTS */}
+            {/* INCOMING REQUESTS (Only if NO active job) */}
             {!activeJob && requests.map(req => (
                 <div key={req._id} className="absolute bottom-24 left-4 right-4 bg-[#121212] text-white p-6 rounded-[32px] shadow-2xl border border-white/10 z-20 animate-in slide-in-from-bottom duration-300">
                     <div className="flex justify-between items-center mb-4"><div className="bg-green-500/10 text-green-400 px-3 py-1 rounded-lg text-[10px] font-black uppercase border border-green-500/20 flex items-center gap-1"><Zap size={12} fill="currentColor"/> High Pay</div><span className="text-neutral-400 text-xs font-bold">Nearby</span></div>
@@ -210,12 +222,9 @@ const VolunteerDashboard = ({ user, globalToast }) => {
     );
   };
 
-  // --- V30 POCKET UI ---
   const PocketView = () => (
     <div className="p-6 pt-24 pb-32 h-full bg-[#050505] animate-in fade-in overflow-y-auto">
-        
-        {/* HERO CARD */}
-        <div className="bg-gradient-to-br from-[#121212] to-[#0a0a0a] rounded-[32px] p-8 border border-white/5 relative overflow-hidden mb-8 shadow-2xl group">
+        <div className="bg-gradient-to-br from-[#121212] to-[#0a0a0a] rounded-[32px] p-8 border border-white/5 text-center shadow-2xl relative overflow-hidden mb-8 shadow-2xl group">
              <div className="absolute -top-10 -right-10 w-40 h-40 bg-green-500/10 rounded-full blur-[50px] pointer-events-none group-hover:bg-green-500/20 transition duration-700"></div>
              
              <div className="flex justify-between items-start mb-6">
@@ -230,7 +239,6 @@ const VolunteerDashboard = ({ user, globalToast }) => {
                  </div>
              </div>
 
-             {/* Live Chart */}
              <div className="flex items-end gap-2 h-16 mb-6 opacity-50">
                  {[40, 65, 30, 80, 50, 90, 45].map((h, i) => (
                      <div key={i} className="flex-1 bg-green-500/20 rounded-t-sm relative group cursor-pointer" style={{height: `${h}%`}}>
@@ -244,7 +252,6 @@ const VolunteerDashboard = ({ user, globalToast }) => {
              </button>
         </div>
 
-        {/* TRANSACTIONS */}
         <div className="mb-8">
             <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><Clock size={18} className="text-neutral-500"/> Recent Activity</h3>
             <div className="space-y-3">
@@ -262,18 +269,6 @@ const VolunteerDashboard = ({ user, globalToast }) => {
                         <span className={`font-black ${t.status==='income'?'text-green-500':'text-white'}`}>{t.amount}</span>
                     </div>
                 ))}
-            </div>
-        </div>
-
-        {/* STATS GRID */}
-        <div className="grid grid-cols-2 gap-4">
-            <div className="bg-[#121212] p-5 rounded-3xl border border-white/5">
-                <p className="text-neutral-500 text-[10px] font-black uppercase mb-2">Jobs Done</p>
-                <h4 className="text-2xl font-black text-white">{financials.jobs}</h4>
-            </div>
-            <div className="bg-[#121212] p-5 rounded-3xl border border-white/5">
-                <p className="text-neutral-500 text-[10px] font-black uppercase mb-2">Total Tips</p>
-                <h4 className="text-2xl font-black text-orange-500">₹{financials.tips}</h4>
             </div>
         </div>
     </div>
