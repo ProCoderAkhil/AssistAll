@@ -15,12 +15,17 @@ const UserDashboard = () => {
   const [tip, setTip] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState('online'); 
 
-  // Fixed URL
+  // ⚠️ FIXED URL: Added '.com' and localhost check
   const DEPLOYED_API_URL = window.location.hostname === 'localhost' 
       ? 'http://localhost:5000' 
       : 'https://assistall-server.onrender.com';
 
-  const pollingRef = useRef(null); // Ref to manage interval safely
+  // Refs for stable polling
+  const stepRef = useRef(step);
+  const pollingRef = useRef(null);
+
+  // Keep ref synced with state
+  useEffect(() => { stepRef.current = step; }, [step]);
 
   // --- 1. RAZORPAY LOADER ---
   const loadRazorpayScript = (src) => {
@@ -73,44 +78,61 @@ const UserDashboard = () => {
     paymentObject.open();
   };
 
-  // --- 3. POLLING (Detects Completion) ---
+  // --- 3. STABLE POLLING (Fixes the Loop) ---
   useEffect(() => {
     if (rideId && (step === 'searching' || step === 'found')) {
-      // Clear existing interval if any
+      // Clear any existing interval
       if (pollingRef.current) clearInterval(pollingRef.current);
 
       pollingRef.current = setInterval(async () => {
+        // Use Ref to check current step without re-triggering effect
+        if (stepRef.current === 'completed') {
+            clearInterval(pollingRef.current);
+            return;
+        }
+
         try {
           const res = await fetch(`${DEPLOYED_API_URL}/api/requests`);
+          if(!res.ok) return; // Skip if network error
+          
           const allRides = await res.json();
           const myRide = allRides.find(r => r._id === rideId);
 
           if (myRide) {
-            // Volunteer Accepted - LOOP FIX: Check if we are already in 'found' state
-            if ((myRide.status === 'accepted' || myRide.status === 'in_progress') && step !== 'found') {
-                setVolunteerDetails({ name: myRide.volunteerName || "Volunteer" });
-                setStep('found');
-                if (navigator.vibrate) navigator.vibrate(200); // Haptic Feedback
+            // Volunteer Accepted
+            if ((myRide.status === 'accepted' || myRide.status === 'in_progress')) {
+                // Only update if we are NOT already found (Prevents Loop)
+                if (stepRef.current !== 'found') {
+                    setVolunteerDetails({ name: myRide.volunteerName || "Volunteer" });
+                    setStep('found'); 
+                }
             }
             
             // Ride Completed
-            if (myRide.status === 'completed' && step !== 'completed') {
+            if (myRide.status === 'completed' && stepRef.current !== 'completed') {
                 setStep('completed');
                 clearInterval(pollingRef.current);
             }
           }
-        } catch (err) { console.error(err); }
+        } catch (err) { console.error("Polling Error (Ignored)"); }
       }, 3000);
     }
     
-    // Cleanup on unmount
     return () => {
         if (pollingRef.current) clearInterval(pollingRef.current);
     };
-  }, [rideId, step]);
+  }, [rideId, step]); // Dependencies
+
+  // --- 4. HAPTIC FEEDBACK (Run only once when Found) ---
+  useEffect(() => {
+      if (step === 'found') {
+          if (navigator.vibrate) navigator.vibrate([200, 100, 200]); // Buzz-Buzz
+      }
+  }, [step]);
 
   // --- ACTIONS ---
   const handleSelectService = (service) => { setSelectedService(service); setStep('input'); };
+  
   const handleCancel = () => { 
       setStep('menu'); 
       setRideId(null); 
@@ -129,8 +151,10 @@ const UserDashboard = () => {
         const data = await res.json();
         setRideId(data._id);
         setStep('searching'); 
+      } else {
+          alert("Request Failed. Is server running?");
       }
-    } catch (e) { alert("Network Error"); }
+    } catch (e) { alert("Connection Failed. Check URL."); }
   };
 
   return (
@@ -153,7 +177,7 @@ const UserDashboard = () => {
         </div>
       )}
 
-      {/* --- STEP 1: MENU (V18 Enhancements) --- */}
+      {/* --- STEP 1: MENU --- */}
       {step === 'menu' && (
          <div className="absolute bottom-0 w-full z-10 bg-white rounded-t-[32px] p-6 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] animate-in slide-in-from-bottom duration-500">
             <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-6"></div>
@@ -213,10 +237,9 @@ const UserDashboard = () => {
           </div>
       )}
 
-      {/* --- STEP 4: FOUND (V18 Live Tracking UI) --- */}
+      {/* --- STEP 4: FOUND --- */}
       {step === 'found' && (
           <div className="absolute bottom-4 left-4 right-4 z-20 bg-[#121212] border border-white/10 p-6 rounded-[32px] shadow-2xl text-white animate-in slide-in-from-bottom duration-500">
-              {/* Notification Badge */}
               <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-blue-600 px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-900/50 flex items-center gap-2">
                   <Bell size={10} fill="currentColor"/> Volunteer Arriving
               </div>
@@ -247,7 +270,7 @@ const UserDashboard = () => {
           </div>
       )}
 
-      {/* --- STEP 5: COMPLETED & PAYMENT --- */}
+      {/* --- STEP 5: COMPLETED --- */}
       {step === 'completed' && (
           <div className="flex-1 bg-white flex flex-col items-center justify-center p-6 animate-in zoom-in duration-500">
               <div className="bg-green-50 p-8 rounded-full shadow-xl mb-6 border border-green-100 animate-bounce">
@@ -287,7 +310,6 @@ const UserDashboard = () => {
                   </button>
               </div>
 
-              {/* PAY BUTTON */}
               <button 
                 onClick={handlePayment}
                 className="w-full max-w-md bg-blue-600 text-white font-black py-5 rounded-2xl text-lg shadow-xl shadow-blue-500/30 hover:bg-blue-700 transition active:scale-[0.98] flex items-center justify-center gap-2"

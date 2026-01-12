@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   MapPin, User, Navigation, Shield, LogOut, Phone, X, ArrowRight, ArrowLeft,
   BarChart2, Star, ChevronRight, IndianRupee, Clock, Car, Menu, 
@@ -40,12 +40,15 @@ const VolunteerDashboard = ({ user, globalToast }) => {
 
   const [activeTab, setActiveTab] = useState('feed'); 
   const [requests, setRequests] = useState([]);
-  const [activeJob, setActiveJob] = useState(null); // CRITICAL STATE
+  const [activeJob, setActiveJob] = useState(null);
   const [financials, setFinancials] = useState({ total: 1250, base: 1000, tips: 250, jobs: 4 }); 
   const [isOnline, setIsOnline] = useState(false);
   const [showOfflineModal, setShowOfflineModal] = useState(false);
   const [toast, setToast] = useState(null);
   
+  // ⚠️ SAFETY LOCK: Prevents background updates from overwriting your screen while you act
+  const isProcessing = useRef(false);
+
   const [bazaarList, setBazaarList] = useState(initialBazaar);
   const [gigsList, setGigsList] = useState(initialGigs);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
@@ -53,25 +56,28 @@ const VolunteerDashboard = ({ user, globalToast }) => {
   const showToast = (msg, type) => { setToast({msg, type}); setTimeout(() => setToast(null), 3000); };
   const getGoalProgress = () => Math.min((financials.total / GOAL_DAILY) * 100, 100);
 
-  // --- API ---
+  // --- API POLLING ---
   const fetchRequests = async () => { 
-    if (!isOnline) return; 
+    if (!isOnline || isProcessing.current) return; // SKIP if offline OR processing an action
+
     try { 
       const res = await fetch(`${DEPLOYED_API_URL}/api/requests`); 
       if (res.ok) { 
           const data = await res.json(); 
           if(Array.isArray(data)) { 
-            // 1. CRITICAL FIX: Check if *I* have an accepted/in-progress job FIRST
-            const myActive = data.find(r => r.volunteerId === user._id && (r.status === 'accepted' || r.status === 'in_progress')); 
+            // Check if *I* have an accepted/in-progress job
+            const myActive = data.find(r => r.volunteerId === user._id && r.status !== 'completed' && r.status !== 'cancelled'); 
             
             if (myActive) {
                 setActiveJob(myActive); // Force UI to show Job Card
-                setRequests([]);        // Hide other requests
+                setRequests([]);        // Hide feed
             } else {
-                setActiveJob(null);     // Show Scanning
-                // Filter only PENDING requests that are NOT completed
-                const pending = data.filter(r => r.status === 'pending');
-                setRequests(pending);
+                // Only reset to null if we are SURE we don't have a job locally
+                // This prevents flickering if the server is slow
+                if (!activeJob) {
+                    const pending = data.filter(r => r.status === 'pending');
+                    setRequests(pending);
+                }
             }
           } 
       } 
@@ -80,21 +86,26 @@ const VolunteerDashboard = ({ user, globalToast }) => {
   
   useEffect(() => { 
       fetchRequests(); 
-      const interval = setInterval(fetchRequests, 3000); // Faster Polling (3s)
+      const interval = setInterval(fetchRequests, 3000); 
       return () => clearInterval(interval); 
   }, [isOnline]);
 
+  // --- ACTION HANDLER ---
   const handleAction = async (id, action) => {
+    // 1. LOCK THE UI (Stop polling)
+    isProcessing.current = true;
+
     try {
         let endpoint = '';
         let body = { volunteerId: user._id, volunteerName: user.name };
 
-        // 1. OPTIMISTIC UI UPDATE (Instant Feedback)
+        // 2. IMMEDIATE LOCAL UPDATE
         if (action === 'accept') {
-            // Find request data locally first to show immediately
             const req = requests.find(r => r._id === id);
-            if(req) setActiveJob({ ...req, status: 'accepted' });
-            
+            if(req) {
+                setActiveJob({ ...req, status: 'accepted', volunteerId: user._id });
+                setRequests([]); // Clear pending list instantly
+            }
             endpoint = `/api/requests/${id}/accept`;
             showToast("Ride Accepted!", "success");
         } 
@@ -105,26 +116,29 @@ const VolunteerDashboard = ({ user, globalToast }) => {
             showToast("Trip Started!", "success");
         } 
         else if (action === 'complete') {
-            setActiveJob(null); // Clear job immediately
+            setActiveJob(null);
             setFinancials(prev => ({ ...prev, total: prev.total + 150, jobs: prev.jobs + 1 }));
             endpoint = `/api/requests/${id}/status`;
             body.status = 'completed';
             showToast("Ride Completed!", "success");
         }
 
-        // 2. SEND TO SERVER
+        // 3. SEND TO SERVER
         await fetch(`${DEPLOYED_API_URL}${endpoint}`, { 
             method: 'PUT', 
             headers: { "Content-Type": "application/json" }, 
             body: JSON.stringify(body)
         });
 
-        // 3. RE-SYNC
-        setTimeout(fetchRequests, 1000);
-
     } catch(e) { 
         showToast("Network Error", "error"); 
-        fetchRequests(); // Revert on error
+        setActiveJob(null); // Revert on error
+    } finally {
+        // 4. UNLOCK AFTER DELAY (Give server time to update DB)
+        setTimeout(() => {
+            isProcessing.current = false;
+            fetchRequests(); // Sync with server now
+        }, 2000);
     }
   };
 
@@ -194,7 +208,7 @@ const VolunteerDashboard = ({ user, globalToast }) => {
                 </div>
             )}
             
-            {/* ACTIVE JOB CARD (Shows immediately after accepting) */}
+            {/* ACTIVE JOB CARD */}
             {activeJob && (
                 <div className="absolute bottom-24 left-4 right-4 bg-white rounded-[32px] shadow-[0_20px_60px_rgba(0,0,0,0.8)] p-6 z-20 border-t-4 border-blue-600 animate-in slide-in-from-bottom duration-500">
                     <div className="flex justify-between items-center mb-6">
