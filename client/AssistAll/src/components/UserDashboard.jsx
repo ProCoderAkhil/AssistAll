@@ -2,123 +2,171 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   MapPin, Navigation, Phone, Search, User, Shield, Menu, Car, Heart, Zap, 
   ShoppingBag, ArrowLeft, ArrowRight, Trash2, CreditCard, Star, CheckCircle, 
-  Clock, Map, Bell, X, MessageSquare, AlertTriangle, Loader2
+  Clock, Map, Bell, X, MessageSquare, AlertTriangle, Loader2, ChevronUp, Share2, ShieldCheck, Banknote
 } from 'lucide-react';
 
+// --- CONFIG ---
+const DEPLOYED_API_URL = window.location.hostname === 'localhost' 
+    ? 'http://localhost:5000' 
+    : 'https://assistall-server.onrender.com';
+
+// ==========================================
+// 1. COMPONENT: RideInProgress (Your Code)
+// ==========================================
+const RideInProgress = ({ requestData }) => {
+  const [isExpanded, setIsExpanded] = useState(true);
+
+  if (!requestData) return <div className="absolute bottom-24 left-0 right-0 text-center text-xs font-bold text-white animate-pulse">Syncing GPS...</div>;
+
+  return (
+    <div className={`absolute left-0 right-0 bg-[#121212] rounded-t-[30px] shadow-[0_-10px_40px_rgba(0,0,0,0.8)] z-50 border-t border-white/10 transition-all duration-500 ease-in-out ${isExpanded ? 'bottom-0 pb-24 h-[60vh]' : 'bottom-0 h-[180px]'}`}>
+      <div className="w-full h-8 flex items-center justify-center cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
+          <div className="w-12 h-1.5 bg-neutral-700 rounded-full mb-1"></div>
+      </div>
+      <div className="px-6">
+          <div className="flex justify-between items-center mb-6">
+              <div>
+                  <div className="flex items-center gap-2 mb-1">
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                      </span>
+                      <p className="text-green-500 text-xs font-bold uppercase tracking-widest">ON TRIP</p>
+                  </div>
+                  <h2 className="text-3xl font-black text-white">{isExpanded ? "Your Ride" : requestData.volunteerName}</h2>
+              </div>
+              <button className="w-10 h-10 bg-neutral-800 rounded-full flex items-center justify-center border border-white/10 text-white hover:bg-neutral-700 active:scale-90 transition">
+                  <Share2 size={18}/>
+              </button>
+          </div>
+          <div className={`transition-opacity duration-300 ${isExpanded ? 'opacity-100' : 'opacity-0 hidden'}`}>
+              <div className="bg-[#1a1a1a] p-5 rounded-3xl border border-white/5 mb-6 relative">
+                  <div className="absolute left-6 top-6 bottom-6 w-0.5 bg-neutral-700"></div>
+                  <div className="flex items-start mb-6 relative z-10">
+                      <div className="w-3 h-3 bg-white rounded-full border-2 border-neutral-500 shadow mr-4 mt-1"></div>
+                      <div><p className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider">Pickup</p><p className="font-bold text-gray-200 text-sm">{requestData.pickupLocation || "Kottayam"}</p></div>
+                  </div>
+                  <div className="flex items-start relative z-10">
+                      <div className="w-3 h-3 bg-green-500 rounded-full border-2 border-white shadow mr-4 mt-1"></div>
+                      <div><p className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider">Destination</p><p className="font-bold text-gray-200 text-sm">{requestData.dropOffLocation || "Medical College"}</p></div>
+                  </div>
+              </div>
+              <div className="flex items-center justify-between bg-black border border-white/10 p-4 rounded-3xl shadow-lg">
+                  <div className="flex items-center">
+                      <div className="w-14 h-14 bg-gradient-to-br from-neutral-800 to-black text-white rounded-2xl flex items-center justify-center font-bold text-xl mr-4 border border-white/5">{requestData.volunteerName?.charAt(0)}</div>
+                      <div>
+                          <p className="font-bold text-white text-lg">{requestData.volunteerName}</p>
+                          <div className="flex items-center mt-1"><ShieldCheck size={12} className="text-blue-500 mr-1"/><span className="text-[10px] text-blue-400 font-bold uppercase">Verified & Safe</span></div>
+                      </div>
+                  </div>
+                  <div className="flex gap-3">
+                      <button className="w-10 h-10 bg-[#1a1a1a] rounded-xl flex items-center justify-center text-white border border-white/10 active:scale-95"><MessageSquare size={18}/></button>
+                      <button className="w-10 h-10 bg-green-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-green-900/40 active:scale-95"><Phone size={18}/></button>
+                  </div>
+              </div>
+          </div>
+          {!isExpanded && (
+              <div className="flex items-center gap-4 text-gray-400 text-sm">
+                  <p>Tap to see full ride details</p>
+                  <ChevronUp size={16} className="animate-bounce"/>
+              </div>
+          )}
+      </div>
+    </div>
+  );
+};
+
+// ==========================================
+// 2. COMPONENT: RateAndTip (Your Code)
+// ==========================================
+const RateAndTip = ({ requestData, onSkip, onSubmit }) => {
+  const [rating, setRating] = useState(5);
+  const [selectedTip, setSelectedTip] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [paymentMode, setPaymentMode] = useState('online');
+
+  const handleCashPayment = () => {
+      setLoading(true);
+      setTimeout(() => {
+          alert(`Please give ₹${selectedTip} cash to volunteer.`);
+          onSubmit();
+          setLoading(false);
+      }, 1000);
+  };
+
+  const handleOnlinePayment = () => {
+      alert("Opening Razorpay..."); // Placeholder for Razorpay
+      onSubmit();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[3000] bg-white flex flex-col items-center justify-center p-6 animate-in zoom-in duration-300">
+      <div className="text-center mb-6"><div className="mx-auto bg-green-100 w-20 h-20 rounded-full flex items-center justify-center mb-4"><CheckCircle size={40} className="text-green-600" /></div><h2 className="text-3xl font-black text-gray-900">Ride Completed!</h2><p className="text-gray-500 mt-2 font-medium">Rate {requestData?.volunteerName}</p></div>
+      <div className="flex justify-center gap-3 mb-8">{[1, 2, 3, 4, 5].map((star) => (<Star key={star} size={40} className={`cursor-pointer transition hover:scale-110 ${star <= rating ? 'text-yellow-400 fill-current' : 'text-gray-200'}`} onClick={() => setRating(star)}/>))}</div>
+      <p className="font-bold text-gray-400 mb-4 text-xs uppercase tracking-widest">ADD A TIP</p>
+      <div className="grid grid-cols-4 gap-3 mb-8 w-full max-w-sm">{[0, 20, 50, 100].map((amt) => (<button key={amt} onClick={() => setSelectedTip(amt)} className={`py-4 rounded-2xl font-bold border transition ${selectedTip === amt ? 'bg-black text-white border-black scale-105 shadow-xl' : 'bg-gray-50 text-gray-700 border-transparent hover:bg-gray-100'}`}>{amt === 0 ? "No" : `₹${amt}`}</button>))}</div>
+      {selectedTip > 0 && (<div className="w-full max-w-sm bg-blue-50 p-4 rounded-2xl mb-6 border border-blue-100"><p className="text-[10px] font-black text-blue-600 uppercase mb-3 flex items-center gap-2"><ShieldCheck size={12}/> Secure Payment</p><div className="flex gap-3"><button onClick={() => setPaymentMode('online')} className={`flex-1 p-3 rounded-xl border-2 flex flex-col items-center justify-center transition ${paymentMode === 'online' ? 'border-blue-600 bg-white text-blue-700 shadow-md' : 'border-transparent bg-blue-100/50 text-gray-500 hover:bg-white'}`}><CreditCard size={24} className="mb-1"/><span className="text-xs font-bold">Online</span></button><button onClick={() => setPaymentMode('cash')} className={`flex-1 p-3 rounded-xl border-2 flex flex-col items-center justify-center transition ${paymentMode === 'cash' ? 'border-green-600 bg-white text-green-700 shadow-md' : 'border-transparent bg-green-100/50 text-gray-500 hover:bg-white'}`}><Banknote size={24} className="mb-1"/><span className="text-xs font-bold">Cash</span></button></div></div>)}
+      {selectedTip > 0 ? (<button onClick={paymentMode === 'online' ? handleOnlinePayment : handleCashPayment} disabled={loading} className={`w-full max-w-sm text-white font-bold py-4 rounded-2xl mb-4 transition flex items-center justify-center shadow-xl active:scale-95 ${paymentMode === 'online' ? 'bg-[#3395ff] hover:bg-[#287acc]' : 'bg-green-600 hover:bg-green-700'}`}>{loading ? <Loader2 className="animate-spin"/> : paymentMode === 'online' ? `Pay ₹${selectedTip}` : "Confirm Cash"}</button>) : (<button onClick={onSubmit} className="w-full max-w-sm bg-black text-white font-bold py-4 rounded-2xl mb-4 hover:bg-gray-800 shadow-xl active:scale-95">Submit Review</button>)}
+      <button onClick={onSkip} className="text-gray-400 font-bold text-sm hover:text-black transition">Skip</button>
+    </div>
+  );
+};
+
+// ==========================================
+// 3. MAIN DASHBOARD (V37 - Logic Fix)
+// ==========================================
 const UserDashboard = () => {
-  // --- STATE MANAGEMENT ---
   const [step, setStep] = useState('menu'); 
   const [selectedService, setSelectedService] = useState(null);
+  const [rideId, setRideId] = useState(null); 
+  const [rideData, setRideData] = useState(null);
   
-  // Load Ride ID from memory if it exists (Fixes refresh/loop issues)
-  const [rideId, setRideId] = useState(() => localStorage.getItem('activeRideId') || null);
-  
-  const [volunteerDetails, setVolunteerDetails] = useState({ name: "Volunteer", vehicle: "Maruti Swift" });
-  
-  // Modals
-  const [showPickupModal, setShowPickupModal] = useState(false);
-  const [showSOS, setShowSOS] = useState(false);
-  
-  // Payment
-  const [tip, setTip] = useState(0);
-  const [paymentMethod, setPaymentMethod] = useState('online'); 
-
-  const DEPLOYED_API_URL = window.location.hostname === 'localhost' 
-      ? 'http://localhost:5000' 
-      : 'https://assistall-server.onrender.com';
-
+  // Ref to prevent loops
+  const lastStatusRef = useRef(null); 
   const pollingRef = useRef(null);
 
-  // --- 1. THE "RATCHET" POLLING ENGINE (V36) ---
+  // --- STABLE POLLING ---
   useEffect(() => {
     if (!rideId) return;
 
-    // Save ID to prevent loss
-    localStorage.setItem('activeRideId', rideId);
+    if (pollingRef.current) clearInterval(pollingRef.current);
 
-    const checkStatus = async () => {
+    pollingRef.current = setInterval(async () => {
       try {
         const res = await fetch(`${DEPLOYED_API_URL}/api/requests?t=${Date.now()}`);
-        if (!res.ok) return;
+        if (res.ok) {
+            const allRides = await res.json();
+            const myRide = allRides.find(r => r._id === rideId);
 
-        const allRides = await res.json();
-        const myRide = allRides.find(r => r._id === rideId);
+            if (myRide) {
+                const currentStatus = myRide.status;
+                
+                // 🛑 ONLY UPDATE IF STATUS CHANGED
+                if (currentStatus !== lastStatusRef.current) {
+                    console.log(`Status Change: ${lastStatusRef.current} -> ${currentStatus}`);
+                    lastStatusRef.current = currentStatus;
+                    setRideData(myRide);
 
-        if (myRide) {
-            const s = myRide.status;
-            
-            // 🛑 RATCHET LOGIC: Only allow FORWARD progress
-            // This prevents the "Loop" if the server flickers
-            
-            // PHASE 1: ACCEPTED (Volunteer Coming)
-            if (s === 'accepted' && step !== 'arriving' && step !== 'riding' && step !== 'completed') {
-                console.log("Status: Accepted -> Arriving");
-                setVolunteerDetails({ name: myRide.volunteerName || "Volunteer", vehicle: "Maruti Swift" });
-                setStep('arriving');
-                if(navigator.vibrate) navigator.vibrate([200, 100, 200]);
-            }
-            
-            // PHASE 2: IN PROGRESS (Picked Up)
-            else if (s === 'in_progress' && step !== 'riding' && step !== 'completed') {
-                console.log("Status: In Progress -> Riding");
-                setStep('riding');
-                setShowPickupModal(true); // SHOW POPUP
-                if(navigator.vibrate) navigator.vibrate(500);
-            }
-
-            // PHASE 3: COMPLETED
-            else if (s === 'completed' && step !== 'completed') {
-                console.log("Status: Completed");
-                setStep('completed');
-                localStorage.removeItem('activeRideId'); // Clear memory
-                if(navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 100]);
+                    if (currentStatus === 'accepted') {
+                        setStep('found'); // Arriving
+                    } 
+                    else if (currentStatus === 'in_progress') {
+                        setStep('riding'); // Shows RideInProgress
+                    }
+                    else if (currentStatus === 'completed') {
+                        setStep('rating'); // Shows RateAndTip
+                        clearInterval(pollingRef.current); // Stop polling
+                    }
+                }
             }
         }
-      } catch (e) { console.error("Sync skip"); }
-    };
-
-    // Run immediately then loop
-    checkStatus();
-    pollingRef.current = setInterval(checkStatus, 3000);
+      } catch (e) {}
+    }, 2000);
 
     return () => clearInterval(pollingRef.current);
-  }, [rideId, step]); // Dependencies ensure we always have fresh state
+  }, [rideId]);
 
-  // --- 2. PAYMENT ---
-  const loadRazorpayScript = (src) => new Promise(resolve => {
-    const script = document.createElement('script');
-    script.src = src;
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.body.appendChild(script);
-  });
-
-  const handlePayment = async () => {
-    if (paymentMethod === 'cash') {
-        alert("Please pay cash to the volunteer.");
-        window.location.reload(); 
-        return;
-    }
-    const res = await loadRazorpayScript('https://checkout.razorpay.com/v1/checkout.js');
-    if (!res) return alert('Razorpay failed.');
-
-    const options = {
-      key: "rzp_test_S1HtYIQWxqe96O", 
-      amount: (150 + tip) * 100, 
-      currency: "INR",
-      name: "AssistAll Payment",
-      description: `Ride Fare`,
-      handler: function (response) {
-        alert(`Success! Ref: ${response.razorpay_payment_id}`);
-        window.location.reload(); 
-      },
-      prefill: { name: "User", contact: "9999999999" },
-      theme: { color: "#3B82F6" }
-    };
-    new window.Razorpay(options).open();
-  };
-
-  // --- 3. ACTIONS ---
+  // --- ACTIONS ---
   const handleConfirmRequest = async () => {
     try {
       const res = await fetch(`${DEPLOYED_API_URL}/api/requests`, {
@@ -129,29 +177,31 @@ const UserDashboard = () => {
       if (res.ok) {
         const data = await res.json();
         setRideId(data._id);
+        lastStatusRef.current = 'pending'; 
         setStep('searching'); 
       }
     } catch (e) { alert("Connection Error"); }
   };
 
   const handleCancel = () => {
-      localStorage.removeItem('activeRideId');
       setRideId(null);
       setStep('menu');
   };
 
-  // --- V36 VIEWS ---
+  const handleReset = () => {
+      window.location.reload();
+  };
 
-  // 1. ARRIVING VIEW
+  // --- VIEWS ---
   const ArrivingView = () => (
       <div className="absolute bottom-4 left-4 right-4 z-20 bg-[#121212] border border-white/10 p-6 rounded-[32px] shadow-2xl text-white animate-in slide-in-from-bottom duration-500">
           <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-blue-600 px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-900/50 flex items-center gap-2">
-              <Bell size={10} fill="currentColor"/> Volunteer Arriving
+              <Bell size={10} fill="currentColor"/> Volunteer Found
           </div>
           <div className="flex justify-between items-start mb-6 mt-2">
               <div>
                   <h3 className="text-gray-400 font-bold text-xs uppercase tracking-widest mb-1 flex items-center gap-1"><Shield size={12}/> VERIFIED PARTNER</h3>
-                  <h2 className="text-3xl font-black tracking-tight">{volunteerDetails.name}</h2>
+                  <h2 className="text-3xl font-black tracking-tight">{rideData?.volunteerName || "Volunteer"}</h2>
                   <div className="flex items-center gap-2 mt-2">
                       <div className="bg-white/10 px-2 py-1 rounded text-xs font-bold flex items-center gap-1"><Star size={10} className="text-yellow-400 fill-current"/> 4.9</div>
                       <div className="bg-white/10 px-2 py-1 rounded text-xs font-bold text-neutral-400">Maruti Swift</div>
@@ -162,47 +212,8 @@ const UserDashboard = () => {
               </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
-              <button className="bg-blue-600 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 hover:bg-blue-500 transition active:scale-95"><Phone size={20}/> Call</button>
-              <button className="bg-neutral-800 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 hover:bg-neutral-700 transition active:scale-95"><Navigation size={20}/> Message</button>
-          </div>
-      </div>
-  );
-
-  // 2. RIDING VIEW (UPDATED)
-  const RidingView = () => (
-      <div className="absolute bottom-4 left-4 right-4 z-20 bg-[#121212] border border-green-500/30 p-6 rounded-[32px] shadow-2xl text-white animate-in slide-in-from-bottom duration-500">
-          <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-green-600 px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg shadow-green-900/50 flex items-center gap-2 animate-pulse">
-              <Navigation size={10} fill="currentColor"/> ON TRIP
-          </div>
-          <div className="flex items-center justify-between mb-8 mt-2">
-              <div>
-                  <p className="text-neutral-400 text-xs font-bold uppercase mb-1">Heading to</p>
-                  <h2 className="text-2xl font-black text-white">Medical College</h2>
-                  <p className="text-green-400 text-sm font-bold mt-1">~15 mins remaining</p>
-              </div>
-              <div className="w-14 h-14 bg-green-900/20 rounded-full border-2 border-green-500 flex items-center justify-center animate-pulse">
-                  <Car size={24} className="text-green-500"/>
-              </div>
-          </div>
-          <div className="w-full bg-neutral-800 h-1.5 rounded-full mb-6 overflow-hidden">
-              <div className="bg-green-500 h-full w-[60%] rounded-full shadow-[0_0_15px_rgba(34,197,94,0.8)]"></div>
-          </div>
-          <button onClick={() => setShowSOS(true)} className="w-full bg-red-900/20 border border-red-500/50 text-red-500 font-bold py-4 rounded-2xl flex items-center justify-center gap-2 hover:bg-red-900/40 transition active:scale-95">
-              <AlertTriangle size={20}/> Emergency SOS
-          </button>
-      </div>
-  );
-
-  // 3. POPUP MODAL (When Picked Up)
-  const PickupModal = () => (
-      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md animate-in fade-in">
-          <div className="bg-white w-[85%] max-w-sm p-6 rounded-[32px] text-center shadow-2xl animate-in zoom-in duration-300">
-              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-white shadow-lg">
-                  <Car size={40} className="text-green-600"/>
-              </div>
-              <h2 className="text-2xl font-black mb-2 text-neutral-900">Ride Started!</h2>
-              <p className="text-neutral-500 mb-8 font-medium leading-relaxed">Volunteer picked you up.<br/>Heading to destination.</p>
-              <button onClick={() => setShowPickupModal(false)} className="w-full bg-black text-white font-bold py-4 rounded-2xl shadow-xl hover:scale-[1.02] transition">Awesome</button>
+              <button className="bg-green-600 text-black font-bold py-4 rounded-2xl flex items-center justify-center gap-2 active:scale-95"><Phone size={20}/> Call</button>
+              <button className="bg-neutral-800 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 active:scale-95"><Navigation size={20}/> Message</button>
           </div>
       </div>
   );
@@ -211,7 +222,7 @@ const UserDashboard = () => {
     <div className="h-screen bg-neutral-100 text-black font-sans flex flex-col relative overflow-hidden">
       
       {/* HEADER */}
-      {step !== 'completed' && (
+      {step !== 'rating' && (
         <div className="absolute top-0 w-full z-20 p-4 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent">
             <button onClick={() => setStep('menu')} className="p-3 bg-neutral-800/80 rounded-full text-white backdrop-blur-md border border-white/10 hover:bg-neutral-700 transition"><Menu size={20}/></button>
             <div className="flex items-center gap-2 px-4 py-2 bg-neutral-800/80 rounded-full border border-neutral-700 text-white backdrop-blur-md">
@@ -221,15 +232,15 @@ const UserDashboard = () => {
       )}
 
       {/* MAP */}
-      {step !== 'completed' && (
+      {step !== 'rating' && (
         <div className="absolute inset-0 z-0">
             <iframe width="100%" height="100%" frameBorder="0" scrolling="no" src="https://www.openstreetmap.org/export/embed.html?bbox=76.51%2C9.58%2C76.54%2C9.60&amp;layer=mapnik&amp;marker=9.59%2C76.52" style={{ filter: 'grayscale(100%) invert(90%) contrast(120%)' }}></iframe>
         </div>
       )}
 
-      {/* RENDER STEPS */}
+      {/* STATES */}
       {step === 'menu' && (
-         <div className="absolute bottom-0 w-full z-10 bg-white rounded-t-[32px] p-6 shadow-2xl animate-in slide-in-from-bottom">
+         <div className="absolute bottom-0 w-full z-10 bg-white rounded-t-[32px] p-6 shadow-2xl animate-in slide-in-from-bottom duration-500">
             <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-6"></div>
             <h2 className="text-2xl font-black mb-6 text-neutral-800">What do you need?</h2>
             <div className="grid grid-cols-2 gap-4">
@@ -258,41 +269,16 @@ const UserDashboard = () => {
                    <div className="w-32 h-32 bg-black border-4 border-blue-500 rounded-full flex items-center justify-center relative z-10"><Search size={40} className="text-blue-500 animate-pulse"/></div>
                </div>
                <h3 className="text-2xl font-black mb-1">Finding Help...</h3>
-               <button onClick={handleCancel} className="bg-white/10 backdrop-blur-md px-8 py-3 rounded-full font-bold text-sm text-white mt-6">Cancel</button>
+               <button onClick={handleCancel} className="bg-white/10 backdrop-blur-md px-8 py-3 rounded-full font-bold text-sm text-white mt-6">Cancel Request</button>
           </div>
       )}
 
-      {step === 'arriving' && <ArrivingView />}
-      {step === 'riding' && <RidingView />}
+      {step === 'found' && <ArrivingView />}
+      {step === 'riding' && <RideInProgress requestData={rideData} />}
+      {step === 'rating' && <RateAndTip requestData={rideData} onSkip={handleReset} onSubmit={handleReset} />}
 
-      {step === 'completed' && (
-          <div className="fixed inset-0 z-50 bg-white flex flex-col items-center justify-center p-6 animate-in zoom-in duration-500">
-              <div className="bg-green-50 p-8 rounded-full shadow-xl mb-6 border border-green-100 animate-bounce"><CheckCircle size={64} className="text-green-500"/></div>
-              <h1 className="text-4xl font-black mb-2 text-neutral-900 tracking-tight">Ride Completed!</h1>
-              <div className="flex gap-2 mb-10">{[1,2,3,4,5].map(i => <Star key={i} size={36} className="text-yellow-400 fill-current drop-shadow-md cursor-pointer hover:scale-110 transition"/>)}</div>
-              
-              <div className="w-full max-w-md mb-8">
-                  <p className="text-xs font-black text-neutral-400 uppercase tracking-widest mb-4 text-center">ADD A TIP</p>
-                  <div className="grid grid-cols-4 gap-3">
-                      {[0, 20, 50, 100].map(amount => (
-                          <button key={amount} onClick={() => setTip(amount)} className={`py-3 rounded-2xl font-bold border-2 transition active:scale-95 ${tip === amount ? 'bg-black text-white border-black' : 'bg-white text-black border-gray-100'}`}>{amount === 0 ? 'No' : `₹${amount}`}</button>
-                      ))}
-                  </div>
-              </div>
-
-              <button onClick={handlePayment} className="w-full max-w-md bg-blue-600 text-white font-black py-5 rounded-2xl text-lg shadow-xl hover:bg-blue-700 transition active:scale-[0.98]">
-                  {paymentMethod === 'online' ? `Pay ₹${150 + tip}` : `Confirm Cash Payment`} <ArrowRight size={20}/>
-              </button>
-              <button onClick={() => window.location.reload()} className="mt-6 text-gray-400 font-bold text-xs uppercase tracking-widest hover:text-black transition">Skip</button>
-          </div>
-      )}
-
-      {showPickupModal && <PickupModal />}
-      {showSOS && <SOSModal />}
     </div>
   );
 };
-
-const SOSModal = () => <div className="fixed inset-0 z-[100] bg-red-900/90 flex items-center justify-center text-white"><h1 className="text-4xl font-black">SOS ALERT SENT</h1></div>;
 
 export default UserDashboard;
