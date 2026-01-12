@@ -2,186 +2,126 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   MapPin, Navigation, Phone, Search, User, Shield, Menu, Car, Heart, Zap, 
   ShoppingBag, ArrowLeft, ArrowRight, Trash2, CreditCard, Star, CheckCircle, 
-  Clock, Map, Bell, X, MessageSquare, AlertTriangle, Loader2, ChevronUp, Share2, ShieldCheck
+  Clock, Map, Bell, X, MessageSquare, AlertTriangle, Loader2
 } from 'lucide-react';
 
-// --- CONFIG ---
-const DEPLOYED_API_URL = window.location.hostname === 'localhost' 
-    ? 'http://localhost:5000' 
-    : 'https://assistall-server.onrender.com';
-
-// ==========================================
-// 1. YOUR COMPONENT: FindingVolunteer
-// ==========================================
-const FindingVolunteer = ({ onCancel }) => {
-  return (
-    <div className="absolute bottom-0 left-0 right-0 z-[2000] bg-white rounded-t-[32px] shadow-[0_-10px_40px_rgba(0,0,0,0.2)] p-8 pb-12 animate-in slide-in-from-bottom duration-500">
-      <div className="flex flex-col items-center justify-center text-center mt-4">
-        {/* Radar Animation */}
-        <div className="relative flex items-center justify-center mb-8">
-            <div className="absolute w-64 h-64 bg-green-500/10 rounded-full animate-ping" style={{ animationDuration: '3s' }}></div>
-            <div className="absolute w-48 h-48 bg-green-500/20 rounded-full animate-ping" style={{ animationDuration: '2s' }}></div>
-            <div className="bg-black p-6 rounded-full z-10 shadow-2xl relative">
-                <Loader2 className="text-white animate-spin" size={40} />
-            </div>
-        </div>
-
-        <h3 className="text-2xl font-bold text-gray-900 mb-2">Finding Volunteers...</h3>
-        <p className="text-gray-500 text-sm max-w-xs mb-8">
-          Broadcasting your request to nearby verified helpers in Kottayam.
-        </p>
-
-        <button onClick={onCancel} className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center hover:bg-red-100 hover:text-red-600 transition shadow-lg">
-            <X size={24}/>
-        </button>
-      </div>
-    </div>
-  );
-};
-
-// ==========================================
-// 2. YOUR COMPONENT: RideInProgress
-// ==========================================
-const RideInProgress = ({ requestData }) => {
-  const [isExpanded, setIsExpanded] = useState(true); // "Movable" State
-
-  if (!requestData) return <div className="absolute bottom-24 left-0 right-0 text-center text-xs font-bold text-white animate-pulse">Syncing GPS...</div>;
-
-  return (
-    <div className={`absolute left-0 right-0 bg-[#121212] rounded-t-[30px] shadow-[0_-10px_40px_rgba(0,0,0,0.8)] z-50 border-t border-white/10 transition-all duration-500 ease-in-out ${isExpanded ? 'bottom-0 pb-24 h-[60vh]' : 'bottom-0 h-[180px]'}`}>
-      
-      {/* --- DRAG HANDLE --- */}
-      <div className="w-full h-8 flex items-center justify-center cursor-pointer" onClick={() => setIsExpanded(!isExpanded)}>
-          <div className="w-12 h-1.5 bg-neutral-700 rounded-full mb-1"></div>
-      </div>
-
-      <div className="px-6">
-          {/* Header Status */}
-          <div className="flex justify-between items-center mb-6">
-              <div>
-                  <div className="flex items-center gap-2 mb-1">
-                      <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                      </span>
-                      <p className="text-green-500 text-xs font-bold uppercase tracking-widest">ON TRIP</p>
-                  </div>
-                  <h2 className="text-3xl font-black text-white">{isExpanded ? "Your Ride" : requestData.volunteerName}</h2>
-              </div>
-              <button className="w-10 h-10 bg-neutral-800 rounded-full flex items-center justify-center border border-white/10 text-white hover:bg-neutral-700 active:scale-90 transition">
-                  <Share2 size={18}/>
-              </button>
-          </div>
-          
-          {/* --- EXPANDABLE CONTENT --- */}
-          <div className={`transition-opacity duration-300 ${isExpanded ? 'opacity-100' : 'opacity-0 hidden'}`}>
-              
-              {/* Route Timeline */}
-              <div className="bg-[#1a1a1a] p-5 rounded-3xl border border-white/5 mb-6 relative">
-                  <div className="absolute left-6 top-6 bottom-6 w-0.5 bg-neutral-700"></div>
-                  <div className="flex items-start mb-6 relative z-10">
-                      <div className="w-3 h-3 bg-white rounded-full border-2 border-neutral-500 shadow mr-4 mt-1"></div>
-                      <div><p className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider">Pickup</p><p className="font-bold text-gray-200 text-sm">{requestData.pickupLocation || "Kottayam"}</p></div>
-                  </div>
-                  <div className="flex items-start relative z-10">
-                      <div className="w-3 h-3 bg-green-500 rounded-full border-2 border-white shadow mr-4 mt-1"></div>
-                      <div><p className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider">Destination</p><p className="font-bold text-gray-200 text-sm">{requestData.dropOffLocation || "Medical College"}</p></div>
-                  </div>
-              </div>
-
-              {/* Driver Profile */}
-              <div className="flex items-center justify-between bg-black border border-white/10 p-4 rounded-3xl shadow-lg">
-                  <div className="flex items-center">
-                      <div className="w-14 h-14 bg-gradient-to-br from-neutral-800 to-black text-white rounded-2xl flex items-center justify-center font-bold text-xl mr-4 border border-white/5">{requestData.volunteerName?.charAt(0)}</div>
-                      <div>
-                          <p className="font-bold text-white text-lg">{requestData.volunteerName}</p>
-                          <div className="flex items-center mt-1"><ShieldCheck size={12} className="text-blue-500 mr-1"/><span className="text-[10px] text-blue-400 font-bold uppercase">Verified & Safe</span></div>
-                      </div>
-                  </div>
-                  <div className="flex gap-3">
-                      <button className="w-10 h-10 bg-[#1a1a1a] rounded-xl flex items-center justify-center text-white border border-white/10 active:scale-95"><MessageSquare size={18}/></button>
-                      <button className="w-10 h-10 bg-green-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-green-900/40 active:scale-95"><Phone size={18}/></button>
-                  </div>
-              </div>
-          </div>
-          
-          {/* Mini View (When Collapsed) */}
-          {!isExpanded && (
-              <div className="flex items-center gap-4 text-gray-400 text-sm">
-                  <p>Tap to see full ride details</p>
-                  <ChevronUp size={16} className="animate-bounce"/>
-              </div>
-          )}
-      </div>
-    </div>
-  );
-};
-
-// ==========================================
-// 3. MAIN CONTROLLER (UserDashboard)
-// ==========================================
 const UserDashboard = () => {
-  const [step, setStep] = useState('menu'); 
+  // UI State
+  const [step, setStep] = useState('menu'); // 'menu' | 'input' | 'searching' | 'arriving' | 'riding' | 'rating'
   const [selectedService, setSelectedService] = useState(null);
+  
+  // Data State
   const [rideId, setRideId] = useState(null); 
-  const [rideData, setRideData] = useState(null);
+  const [volunteerDetails, setVolunteerDetails] = useState({ name: "Volunteer", vehicle: "Maruti Swift" });
+  
+  // Modals
+  const [showPickupModal, setShowPickupModal] = useState(false);
+  const [showSOS, setShowSOS] = useState(false);
   
   // Payment
   const [tip, setTip] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState('online'); 
 
-  // Polling Refs (The Fix for Looping)
-  const isPolling = useRef(false);
-  const lastStatusRef = useRef(null); 
+  // System
+  const DEPLOYED_API_URL = window.location.hostname === 'localhost' 
+      ? 'http://localhost:5000' 
+      : 'https://assistall-server.onrender.com';
 
-  // --- POLLING ENGINE ---
+  // ⚠️ THE FIX: This Ref prevents the loop by remembering the last status
+  const lastStatusRef = useRef('pending'); 
+  const pollingRef = useRef(null);
+
+  // --- 1. STABLE POLLING ENGINE (V35) ---
   useEffect(() => {
-    if (!rideId || step === 'completed') return;
+    if (!rideId) return;
 
-    isPolling.current = true;
+    // Clear any previous interval to be safe
+    if (pollingRef.current) clearInterval(pollingRef.current);
 
-    const checkStatus = async () => {
-      if (!isPolling.current) return;
-
+    pollingRef.current = setInterval(async () => {
       try {
-        const res = await fetch(`${DEPLOYED_API_URL}/api/requests?t=${Date.now()}`);
-        if (res.ok) {
-            const allRides = await res.json();
-            const myRide = allRides.find(r => r._id === rideId);
+        const res = await fetch(`${DEPLOYED_API_URL}/api/requests?t=${Date.now()}`); // Prevent caching
+        if (!res.ok) return;
 
-            if (myRide) {
-                const currentStatus = myRide.status;
-                
-                // ⚠️ CRITICAL FIX: Only update if status CHANGED
-                if (currentStatus !== lastStatusRef.current) {
-                    console.log(`Status Updated: ${lastStatusRef.current} -> ${currentStatus}`);
-                    lastStatusRef.current = currentStatus;
-                    setRideData(myRide);
+        const allRides = await res.json();
+        const myRide = allRides.find(r => r._id === rideId);
 
-                    // LOGIC SWITCHER
-                    if (currentStatus === 'accepted') {
-                        setStep('found'); // "Arriving"
-                        if(navigator.vibrate) navigator.vibrate([200]);
-                    } 
-                    else if (currentStatus === 'in_progress') {
-                        setStep('riding'); // "On Trip" - Shows RideInProgress Component
-                        if(navigator.vibrate) navigator.vibrate(500);
-                    }
-                    else if (currentStatus === 'completed') {
-                        setStep('completed');
-                        isPolling.current = false;
-                    }
+        if (myRide) {
+            const serverStatus = myRide.status;
+            
+            // 🛑 CRITICAL CHECK: Only act if status CHANGED
+            if (serverStatus !== lastStatusRef.current) {
+                console.log(`STATUS CHANGE DETECTED: ${lastStatusRef.current} -> ${serverStatus}`);
+                lastStatusRef.current = serverStatus; // Update Ref immediately
+
+                // UPDATE UI BASED ON NEW STATUS
+                if (serverStatus === 'accepted') {
+                    setVolunteerDetails(prev => ({ ...prev, name: myRide.volunteerName || "Volunteer" }));
+                    setStep('arriving');
+                    if(navigator.vibrate) navigator.vibrate([200, 100, 200]);
+                } 
+                else if (serverStatus === 'in_progress') {
+                    setStep('riding');
+                    setShowPickupModal(true); // Show "Picked Up" Pop-up
+                    if(navigator.vibrate) navigator.vibrate(500);
+                }
+                else if (serverStatus === 'completed') {
+                    setStep('rating'); // Show Rating Screen
+                    if(navigator.vibrate) navigator.vibrate([100, 50, 100, 50, 100]);
+                    stopPolling(); // Stop checking
                 }
             }
         }
-      } catch (e) {}
+      } catch (e) { console.error("Polling Error", e); }
+    }, 2000); // Check every 2 seconds
 
-      if (isPolling.current) setTimeout(checkStatus, 3000);
+    return () => stopPolling();
+  }, [rideId]); // Only restart if rideId changes, NOT on step change
+
+  const stopPolling = () => {
+      if (pollingRef.current) {
+          clearInterval(pollingRef.current);
+          pollingRef.current = null;
+      }
+  };
+
+  // --- 2. PAYMENT LOGIC ---
+  const loadRazorpayScript = (src) => {
+    return new Promise((resolve) => {
+      const script = document.createElement('script');
+      script.src = src;
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
+  const handlePayment = async () => {
+    if (paymentMethod === 'cash') {
+        alert("Please pay cash to the volunteer.");
+        window.location.reload(); 
+        return;
+    }
+    const res = await loadRazorpayScript('https://checkout.razorpay.com/v1/checkout.js');
+    if (!res) return alert('Razorpay failed to load.');
+
+    const options = {
+      key: "rzp_test_S1HtYIQWxqe96O", 
+      amount: (150 + tip) * 100, 
+      currency: "INR",
+      name: "AssistAll Payment",
+      description: `Ride Fare`,
+      image: "https://cdn-icons-png.flaticon.com/512/1041/1041888.png",
+      handler: function (response) {
+        alert(`Success! Ref: ${response.razorpay_payment_id}`);
+        window.location.reload(); 
+      },
+      prefill: { name: "User", contact: "9999999999" },
+      theme: { color: "#3B82F6" }
     };
-
-    checkStatus();
-    return () => { isPolling.current = false; };
-  }, [rideId, step]);
+    const rzp = new window.Razorpay(options);
+    rzp.open();
+  };
 
   // --- ACTIONS ---
   const handleConfirmRequest = async () => {
@@ -194,29 +134,109 @@ const UserDashboard = () => {
       if (res.ok) {
         const data = await res.json();
         setRideId(data._id);
+        lastStatusRef.current = 'pending'; // Reset tracker
         setStep('searching'); 
       }
     } catch (e) { alert("Connection Error"); }
   };
 
   const handleCancel = () => {
-      isPolling.current = false;
+      stopPolling();
       setRideId(null);
-      lastStatusRef.current = null;
       setStep('menu');
   };
 
-  const handlePayment = () => {
-      alert("Payment Feature Loading... (Simulated Success)");
-      window.location.reload();
-  };
+  // --- VIEWS ---
 
-  // --- MAIN RENDER ---
+  const SearchingView = () => (
+      <div className="absolute bottom-0 w-full z-10 p-6 flex flex-col items-center pb-12 bg-gradient-to-t from-black via-black/90 to-transparent text-white animate-in fade-in">
+           <div className="relative mb-8">
+               <div className="w-32 h-32 bg-blue-500/10 rounded-full animate-ping absolute inset-0"></div>
+               <div className="w-32 h-32 bg-black border-4 border-blue-500 rounded-full flex items-center justify-center relative z-10"><Search size={40} className="text-blue-500 animate-pulse"/></div>
+           </div>
+           <h3 className="text-2xl font-black mb-1">Finding Help...</h3>
+           <p className="text-neutral-400 text-sm font-medium mb-6">Broadcasting to nearby volunteers</p>
+           <button onClick={handleCancel} className="bg-white/10 backdrop-blur-md px-8 py-3 rounded-full font-bold text-sm text-white hover:bg-white/20 transition">Cancel Request</button>
+      </div>
+  );
+
+  const ArrivingView = () => (
+      <div className="absolute bottom-4 left-4 right-4 z-20 bg-[#121212] border border-white/10 p-6 rounded-[32px] shadow-2xl text-white animate-in slide-in-from-bottom duration-500">
+          <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-blue-600 px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-900/50 flex items-center gap-2">
+              <Bell size={10} fill="currentColor"/> Volunteer Found
+          </div>
+          <div className="flex justify-between items-start mb-6 mt-2">
+              <div>
+                  <h3 className="text-gray-400 font-bold text-xs uppercase tracking-widest mb-1 flex items-center gap-1"><Shield size={12}/> VERIFIED PARTNER</h3>
+                  <h2 className="text-3xl font-black tracking-tight">{volunteerDetails.name}</h2>
+                  <div className="flex items-center gap-2 mt-2">
+                      <div className="bg-white/10 px-2 py-1 rounded text-xs font-bold flex items-center gap-1"><Star size={10} className="text-yellow-400 fill-current"/> 4.9</div>
+                      <div className="bg-white/10 px-2 py-1 rounded text-xs font-bold text-neutral-400">{volunteerDetails.vehicle}</div>
+                  </div>
+              </div>
+              <div className="w-16 h-16 bg-neutral-800 rounded-full border-2 border-blue-500 flex items-center justify-center">
+                  <User size={28} className="text-white"/>
+              </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+              <button className="bg-green-600 text-black font-bold py-4 rounded-2xl flex items-center justify-center gap-2 active:scale-95"><Phone size={20}/> Call</button>
+              <button className="bg-neutral-800 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 active:scale-95"><Navigation size={20}/> Message</button>
+          </div>
+      </div>
+  );
+
+  const RidingView = () => (
+      <div className="absolute bottom-4 left-4 right-4 z-20 bg-[#121212] border border-green-500/30 p-6 rounded-[32px] shadow-2xl text-white animate-in slide-in-from-bottom duration-500">
+          <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-green-600 px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg shadow-green-900/50 flex items-center gap-2 animate-pulse">
+              <Navigation size={10} fill="currentColor"/> ON TRIP
+          </div>
+          <div className="flex items-center justify-between mb-8 mt-2">
+              <div>
+                  <p className="text-neutral-400 text-xs font-bold uppercase mb-1">Heading to</p>
+                  <h2 className="text-2xl font-black text-white">Medical College</h2>
+                  <p className="text-green-400 text-sm font-bold mt-1">~15 mins remaining</p>
+              </div>
+              <div className="w-14 h-14 bg-green-900/20 rounded-full border-2 border-green-500 flex items-center justify-center animate-pulse">
+                  <Car size={24} className="text-green-500"/>
+              </div>
+          </div>
+          <div className="w-full bg-neutral-800 h-1.5 rounded-full mb-6 overflow-hidden">
+              <div className="bg-green-500 h-full w-[60%] rounded-full shadow-[0_0_15px_rgba(34,197,94,0.8)]"></div>
+          </div>
+          <button onClick={() => setShowSOS(true)} className="w-full bg-red-900/20 border border-red-500/50 text-red-500 font-bold py-4 rounded-2xl flex items-center justify-center gap-2 active:scale-95">
+              <AlertTriangle size={20}/> Emergency SOS
+          </button>
+      </div>
+  );
+
+  const RatingView = () => (
+      <div className="fixed inset-0 z-50 bg-white flex flex-col items-center justify-center p-6 animate-in zoom-in duration-500">
+          <div className="bg-green-50 p-8 rounded-full shadow-xl mb-6 border border-green-100 animate-bounce"><CheckCircle size={64} className="text-green-500"/></div>
+          <h1 className="text-4xl font-black mb-2 text-neutral-900 tracking-tight">Ride Completed!</h1>
+          <p className="text-neutral-500 font-medium mb-10 text-center">How was your experience with <br/><span className="font-bold text-black">{volunteerDetails.name}</span>?</p>
+          <div className="flex gap-2 mb-10">{[1,2,3,4,5].map(i => <Star key={i} size={36} className="text-yellow-400 fill-current drop-shadow-md cursor-pointer hover:scale-110 transition"/>)}</div>
+          
+          <div className="w-full max-w-md mb-8">
+              <p className="text-xs font-black text-neutral-400 uppercase tracking-widest mb-4 text-center">ADD A TIP</p>
+              <div className="grid grid-cols-4 gap-3">
+                  {[0, 20, 50, 100].map(amount => (
+                      <button key={amount} onClick={() => setTip(amount)} className={`py-3 rounded-2xl font-bold border-2 transition active:scale-95 ${tip === amount ? 'bg-black text-white border-black' : 'bg-white text-black border-gray-100'}`}>{amount === 0 ? 'No' : `₹${amount}`}</button>
+                  ))}
+              </div>
+          </div>
+
+          <button onClick={handlePayment} className="w-full max-w-md bg-blue-600 text-white font-black py-5 rounded-2xl text-lg shadow-xl active:scale-[0.98]">
+              {paymentMethod === 'online' ? `Pay ₹${150 + tip}` : `Confirm Cash Payment`} <ArrowRight size={20} className="ml-2 inline"/>
+          </button>
+          <button onClick={() => window.location.reload()} className="mt-6 text-gray-400 font-bold text-xs uppercase tracking-widest hover:text-black transition">Skip</button>
+      </div>
+  );
+
   return (
     <div className="h-screen bg-neutral-100 text-black font-sans flex flex-col relative overflow-hidden">
       
       {/* HEADER */}
-      {step !== 'completed' && (
+      {step !== 'rating' && (
         <div className="absolute top-0 w-full z-20 p-4 flex justify-between items-center bg-gradient-to-b from-black/80 to-transparent">
             <button onClick={() => setStep('menu')} className="p-3 bg-neutral-800/80 rounded-full text-white backdrop-blur-md border border-white/10 hover:bg-neutral-700 transition"><Menu size={20}/></button>
             <div className="flex items-center gap-2 px-4 py-2 bg-neutral-800/80 rounded-full border border-neutral-700 text-white backdrop-blur-md">
@@ -225,14 +245,14 @@ const UserDashboard = () => {
         </div>
       )}
 
-      {/* MAP BACKGROUND */}
-      {step !== 'completed' && (
+      {/* MAP */}
+      {step !== 'rating' && (
         <div className="absolute inset-0 z-0">
             <iframe width="100%" height="100%" frameBorder="0" scrolling="no" src="https://www.openstreetmap.org/export/embed.html?bbox=76.51%2C9.58%2C76.54%2C9.60&amp;layer=mapnik&amp;marker=9.59%2C76.52" style={{ filter: 'grayscale(100%) invert(90%) contrast(120%)' }}></iframe>
         </div>
       )}
 
-      {/* 1. MENU */}
+      {/* STATE RENDERER */}
       {step === 'menu' && (
          <div className="absolute bottom-0 w-full z-10 bg-white rounded-t-[32px] p-6 shadow-[0_-10px_40px_rgba(0,0,0,0.1)] animate-in slide-in-from-bottom duration-500">
             <div className="w-12 h-1 bg-gray-300 rounded-full mx-auto mb-6"></div>
@@ -248,47 +268,45 @@ const UserDashboard = () => {
          </div>
       )}
 
-      {/* 2. INPUT */}
       {step === 'input' && (
          <div className="absolute bottom-0 w-full z-10 bg-white rounded-t-[32px] p-6 shadow-2xl animate-in slide-in-from-bottom">
             <button onClick={() => setStep('menu')} className="mb-4"><ArrowLeft className="text-neutral-400"/></button>
             <h2 className="text-2xl font-black mb-6">Request {selectedService}</h2>
+            <div className="space-y-4 mb-8">
+                 <div className="bg-gray-50 p-4 rounded-2xl flex items-center gap-4"><div className="bg-blue-100 p-2 rounded-full"><Navigation size={16} className="text-blue-600"/></div><input type="text" placeholder="Current Location" className="bg-transparent font-bold w-full outline-none"/></div>
+                 <div className="bg-gray-50 p-4 rounded-2xl flex items-center gap-4"><div className="bg-red-100 p-2 rounded-full"><MapPin size={16} className="text-red-600"/></div><input type="text" placeholder="Where to?" className="bg-transparent font-bold w-full outline-none"/></div>
+            </div>
             <button onClick={handleConfirmRequest} className="w-full bg-black text-white font-black py-4 rounded-2xl text-lg flex justify-center items-center gap-3 active:scale-95 transition-all">Confirm Request <ArrowRight size={20}/></button>
          </div>
       )}
 
-      {/* 3. SEARCHING (Using Your Component) */}
-      {step === 'searching' && <FindingVolunteer onCancel={handleCancel} />}
+      {step === 'searching' && <SearchingView />}
+      {step === 'arriving' && <ArrivingView />}
+      {step === 'riding' && <RidingView />}
+      {step === 'rating' && <RatingView />}
 
-      {/* 4. FOUND / ARRIVING */}
-      {step === 'found' && (
-          <div className="absolute bottom-4 left-4 right-4 z-20 bg-[#121212] border border-white/10 p-6 rounded-[32px] shadow-2xl text-white animate-in slide-in-from-bottom duration-500">
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-blue-600 px-4 py-1 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg shadow-blue-900/50 flex items-center gap-2"><Bell size={10} fill="currentColor"/> Volunteer Arriving</div>
-              <div className="flex justify-between items-start mb-6 mt-2">
-                  <div>
-                      <h3 className="text-gray-400 font-bold text-xs uppercase tracking-widest mb-1 flex items-center gap-1"><Shield size={12}/> VERIFIED PARTNER</h3>
-                      <h2 className="text-3xl font-black tracking-tight">{rideData?.volunteerName}</h2>
-                  </div>
-                  <div className="w-16 h-16 bg-neutral-800 rounded-full border-2 border-blue-500 flex items-center justify-center"><User size={28} className="text-white"/></div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                  <button className="bg-green-600 text-black font-bold py-4 rounded-2xl flex items-center justify-center gap-2 active:scale-95"><Phone size={20}/> Call</button>
-                  <button className="bg-neutral-800 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 hover:bg-neutral-700 transition active:scale-95"><Navigation size={20}/> Message</button>
+      {/* POPUPS */}
+      {showPickupModal && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md animate-in fade-in">
+              <div className="bg-white w-[85%] max-w-sm p-6 rounded-[32px] text-center shadow-2xl animate-in zoom-in duration-300">
+                  <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-white shadow-lg"><Car size={40} className="text-blue-600"/></div>
+                  <h2 className="text-2xl font-black mb-2 text-neutral-900">Trip Started!</h2>
+                  <p className="text-neutral-500 mb-8 font-medium">Volunteer has picked you up.</p>
+                  <button onClick={() => setShowPickupModal(false)} className="w-full bg-black text-white font-bold py-4 rounded-2xl shadow-xl hover:scale-[1.02] transition">Let's Go</button>
               </div>
           </div>
       )}
 
-      {/* 5. RIDING (Using Your Component) */}
-      {step === 'riding' && <RideInProgress requestData={rideData} />}
-
-      {/* 6. COMPLETED */}
-      {step === 'completed' && (
-          <div className="fixed inset-0 z-50 bg-white flex flex-col items-center justify-center p-6 animate-in zoom-in duration-500">
-              <div className="bg-green-50 p-8 rounded-full shadow-xl mb-6 border border-green-100 animate-bounce"><CheckCircle size={64} className="text-green-500"/></div>
-              <h1 className="text-4xl font-black mb-2 text-neutral-900 tracking-tight">Ride Completed!</h1>
-              <div className="flex gap-2 mb-10 mt-6">{[1,2,3,4,5].map(i => <Star key={i} size={36} className="text-yellow-400 fill-current drop-shadow-md cursor-pointer hover:scale-110 transition"/>)}</div>
-              <button onClick={handlePayment} className="w-full max-w-md bg-blue-600 text-white font-black py-5 rounded-2xl text-lg shadow-xl hover:bg-blue-700 transition active:scale-[0.98]">Pay ₹150 <ArrowRight size={20}/></button>
-              <button onClick={() => window.location.reload()} className="mt-6 text-gray-400 font-bold text-xs uppercase tracking-widest hover:text-black transition">Skip</button>
+      {showSOS && (
+          <div className="fixed inset-0 z-[100] flex items-end justify-center bg-red-900/90 backdrop-blur-sm animate-in fade-in">
+              <div className="bg-white w-full max-w-md p-6 rounded-t-[32px] animate-in slide-in-from-bottom">
+                  <div className="flex items-center gap-3 mb-6 text-red-600"><AlertTriangle size={32}/><h2 className="text-2xl font-black">Emergency SOS</h2></div>
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                      <button className="p-4 bg-red-50 border border-red-100 rounded-2xl font-bold text-red-700 flex flex-col items-center gap-2"><Phone size={24}/> Call Police</button>
+                      <button className="p-4 bg-gray-50 border border-gray-100 rounded-2xl font-bold text-gray-700 flex flex-col items-center gap-2"><User size={24}/> Contact Family</button>
+                  </div>
+                  <button onClick={() => setShowSOS(false)} className="w-full bg-gray-200 text-gray-800 font-bold py-4 rounded-2xl">Cancel</button>
+              </div>
           </div>
       )}
     </div>
