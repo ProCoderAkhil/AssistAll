@@ -5,10 +5,15 @@ import {
   CheckCircle, FileText, Receipt, Power, Bell, HelpCircle, Wallet,
   Home, Briefcase, ShoppingBag, Gift, Lock, Loader2, Tag, Percent, 
   AlertCircle, Zap, LayoutGrid, Timer, Map as MapIcon, TrendingUp,
-  CreditCard, Fuel, Wrench, Trophy, Calendar
+  CreditCard, Fuel, Wrench, Trophy, Calendar, RefreshCw, Send, DollarSign
 } from 'lucide-react';
 
+// --- CONFIG ---
 const GOAL_DAILY = 2500;
+const DEPLOYED_API_URL = window.location.hostname === 'localhost' 
+    ? 'http://localhost:5000' 
+    : 'https://assistall-server.onrender.com';
+
 const initialGigs = [
   { id: 1, day: 'Mon', date: '12', status: 'open', earnings: '₹800', isSpecial: true, reminder: false },
   { id: 2, day: 'Tue', date: '13', status: 'open', earnings: '₹450', isSpecial: false, reminder: false },
@@ -16,10 +21,18 @@ const initialGigs = [
   { id: 4, day: 'Thu', date: '15', status: 'locked', earnings: null, isSpecial: false, reminder: false },
   { id: 5, day: 'Fri', date: '16', status: 'locked', earnings: null, isSpecial: true, reminder: false },
 ];
+
 const initialBazaar = [
   { id: 1, title: "Medical Insurance", desc: "Coverage ₹5L", price: "ACTIVE", color: "text-green-400 bg-green-900/20 border-green-800", icon: Shield, type: 'active' },
   { id: 2, title: "Fuel Card", desc: "Save ₹3/L", price: "Apply", color: "text-orange-400 bg-orange-900/20 border-orange-800", icon: Fuel, type: 'action' },
   { id: 3, title: "Bike Service", desc: "20% Off", price: "Claim", color: "text-blue-400 bg-blue-900/20 border-blue-800", icon: Wrench, type: 'action' },
+];
+
+const transactions = [
+    { id: 1, to: "HDFC Bank", date: "Today, 10:23 AM", amount: "-₹1,200", status: "success" },
+    { id: 2, to: "Ride #8492", date: "Yesterday", amount: "+₹150", status: "income" },
+    { id: 3, to: "Tip", date: "Yesterday", amount: "+₹50", status: "income" },
+    { id: 4, to: "Fuel Card", date: "12 Oct", amount: "-₹500", status: "success" },
 ];
 
 const VolunteerDashboard = ({ user, globalToast }) => {
@@ -38,11 +51,6 @@ const VolunteerDashboard = ({ user, globalToast }) => {
   const [gigsList, setGigsList] = useState(initialGigs);
   const [isWithdrawing, setIsWithdrawing] = useState(false);
 
-  // ⚠️ FIXED URL: Connects to Render properly
-  const DEPLOYED_API_URL = window.location.hostname === 'localhost' 
-      ? 'http://localhost:5000' 
-      : 'https://assistall-server.onrender.com';
-
   const showToast = (msg, type) => { setToast({msg, type}); setTimeout(() => setToast(null), 3000); };
   const getGoalProgress = () => Math.min((financials.total / GOAL_DAILY) * 100, 100);
 
@@ -54,14 +62,12 @@ const VolunteerDashboard = ({ user, globalToast }) => {
       if (res.ok) { 
           const data = await res.json(); 
           if(Array.isArray(data)) { 
-            // 1. Check if I have an active job
             const myActive = data.find(r => r.volunteerId === user._id && (r.status === 'accepted' || r.status === 'in_progress')); 
             
             if (myActive) {
                 setActiveJob(myActive);
-                setRequests([]); // Clear feed if busy
+                setRequests([]); 
             } else {
-                // 2. If no active job, show pending requests
                 setActiveJob(null);
                 const pending = data.filter(r => r.status === 'pending');
                 setRequests(pending);
@@ -73,7 +79,7 @@ const VolunteerDashboard = ({ user, globalToast }) => {
   
   useEffect(() => { 
       fetchRequests(); 
-      const interval = setInterval(fetchRequests, 5000); // Polling every 5s
+      const interval = setInterval(fetchRequests, 5000); 
       return () => clearInterval(interval); 
   }, [isOnline]);
 
@@ -125,7 +131,8 @@ const VolunteerDashboard = ({ user, globalToast }) => {
       window.location.href = "/"; 
   };
 
-  // --- VIEWS ---
+  // --- V30 VIEWS ---
+
   const OfflineModal = () => (
     <div className="fixed inset-0 bg-black/90 z-[200] flex items-end justify-center animate-in fade-in duration-300 backdrop-blur-sm">
       <div className="bg-[#121212] w-full max-w-md rounded-t-[32px] p-8 border-t border-[#333] animate-in slide-in-from-bottom">
@@ -203,14 +210,71 @@ const VolunteerDashboard = ({ user, globalToast }) => {
     );
   };
 
+  // --- V30 POCKET UI ---
   const PocketView = () => (
     <div className="p-6 pt-24 pb-32 h-full bg-[#050505] animate-in fade-in overflow-y-auto">
-        <div className="bg-gradient-to-br from-[#121212] to-[#0a0a0a] rounded-[32px] p-8 border border-white/5 text-center shadow-2xl relative overflow-hidden mb-8">
-             <div className="absolute -top-10 -right-10 w-40 h-40 bg-green-500/10 rounded-full blur-[50px] pointer-events-none"></div>
-             <p className="text-neutral-500 text-xs font-black uppercase tracking-widest mb-2 relative z-10">TOTAL BALANCE</p>
-             <h2 className="text-6xl font-black text-white mb-8 relative z-10 flex justify-center items-center tracking-tighter"><span className="text-green-500 text-4xl mr-2 font-bold">₹</span>{financials.total}</h2>
-             <div className="w-full bg-[#222] h-2 rounded-full mb-3 overflow-hidden"><div className="bg-green-500 h-full rounded-full transition-all duration-1000 shadow-[0_0_20px_rgba(34,197,94,0.5)]" style={{ width: `${getGoalProgress()}%` }}></div></div>
-             <button onClick={handleWithdraw} disabled={financials.total === 0 || isWithdrawing} className="w-full bg-white text-black font-black py-4 rounded-2xl hover:bg-gray-200 transition active:scale-[0.98] disabled:opacity-50 relative z-10 flex items-center justify-center gap-2">{isWithdrawing ? <Loader2 className="animate-spin"/> : "Withdraw Funds"}</button>
+        
+        {/* HERO CARD */}
+        <div className="bg-gradient-to-br from-[#121212] to-[#0a0a0a] rounded-[32px] p-8 border border-white/5 relative overflow-hidden mb-8 shadow-2xl group">
+             <div className="absolute -top-10 -right-10 w-40 h-40 bg-green-500/10 rounded-full blur-[50px] pointer-events-none group-hover:bg-green-500/20 transition duration-700"></div>
+             
+             <div className="flex justify-between items-start mb-6">
+                 <div>
+                     <p className="text-neutral-500 text-xs font-black uppercase tracking-widest mb-1">Available Balance</p>
+                     <h2 className="text-5xl font-black text-white tracking-tighter flex items-start gap-1">
+                         <span className="text-2xl mt-2 text-green-500">₹</span>{financials.total}
+                     </h2>
+                 </div>
+                 <div className="bg-[#1a1a1a] p-3 rounded-2xl border border-white/5">
+                     <CreditCard size={24} className="text-white"/>
+                 </div>
+             </div>
+
+             {/* Live Chart */}
+             <div className="flex items-end gap-2 h-16 mb-6 opacity-50">
+                 {[40, 65, 30, 80, 50, 90, 45].map((h, i) => (
+                     <div key={i} className="flex-1 bg-green-500/20 rounded-t-sm relative group cursor-pointer" style={{height: `${h}%`}}>
+                         <div className="absolute inset-0 bg-green-500 opacity-0 group-hover:opacity-100 transition duration-300"></div>
+                     </div>
+                 ))}
+             </div>
+
+             <button onClick={handleWithdraw} disabled={financials.total === 0 || isWithdrawing} className="w-full bg-white text-black font-black py-4 rounded-2xl hover:bg-gray-200 transition active:scale-[0.98] disabled:opacity-50 relative z-10 flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(255,255,255,0.1)]">
+                 {isWithdrawing ? <Loader2 className="animate-spin"/> : <><ArrowRight size={20} className="-rotate-45"/> Withdraw to Bank</>}
+             </button>
+        </div>
+
+        {/* TRANSACTIONS */}
+        <div className="mb-8">
+            <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><Clock size={18} className="text-neutral-500"/> Recent Activity</h3>
+            <div className="space-y-3">
+                {transactions.map(t => (
+                    <div key={t.id} className="bg-[#121212] p-4 rounded-2xl border border-white/5 flex items-center justify-between hover:bg-[#1a1a1a] transition">
+                        <div className="flex items-center gap-4">
+                            <div className={`p-3 rounded-xl ${t.status==='income'?'bg-green-500/10 text-green-500':'bg-neutral-800 text-white'}`}>
+                                {t.status==='income' ? <ArrowLeft size={18} className="rotate-45"/> : <ArrowRight size={18} className="-rotate-45"/>}
+                            </div>
+                            <div>
+                                <p className="font-bold text-white">{t.to}</p>
+                                <p className="text-xs text-neutral-500 font-medium">{t.date}</p>
+                            </div>
+                        </div>
+                        <span className={`font-black ${t.status==='income'?'text-green-500':'text-white'}`}>{t.amount}</span>
+                    </div>
+                ))}
+            </div>
+        </div>
+
+        {/* STATS GRID */}
+        <div className="grid grid-cols-2 gap-4">
+            <div className="bg-[#121212] p-5 rounded-3xl border border-white/5">
+                <p className="text-neutral-500 text-[10px] font-black uppercase mb-2">Jobs Done</p>
+                <h4 className="text-2xl font-black text-white">{financials.jobs}</h4>
+            </div>
+            <div className="bg-[#121212] p-5 rounded-3xl border border-white/5">
+                <p className="text-neutral-500 text-[10px] font-black uppercase mb-2">Total Tips</p>
+                <h4 className="text-2xl font-black text-orange-500">₹{financials.tips}</h4>
+            </div>
         </div>
     </div>
   );
