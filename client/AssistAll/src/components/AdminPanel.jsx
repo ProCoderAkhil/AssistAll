@@ -73,8 +73,6 @@ const AdminPanel = ({ onLogout }) => {
       } catch(e) { addNotification("Failed", "error"); }
   };
 
-  // --- VIEWS ---
-
   const DashboardView = () => (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-in fade-in">
           <div className="bg-neutral-900 p-6 rounded-2xl border border-neutral-800"><h3 className="text-neutral-500 text-xs font-bold uppercase">Total Users</h3><p className="text-3xl font-black text-white">{stats.users}</p></div>
@@ -85,7 +83,6 @@ const AdminPanel = ({ onLogout }) => {
 
   const VerificationView = () => (
     <div className="space-y-6 animate-in slide-in-from-right">
-        {/* OTP Generator Panel */}
         <div className="bg-gradient-to-r from-blue-900/20 to-purple-900/20 p-8 rounded-3xl border border-blue-500/30 flex flex-col md:flex-row justify-between items-center gap-6">
             <div>
                 <h3 className="text-2xl font-bold text-white mb-2">Live Interview Control</h3>
@@ -102,12 +99,8 @@ const AdminPanel = ({ onLogout }) => {
             </div>
         </div>
 
-        {/* Pending List */}
         <div className="bg-neutral-900 rounded-3xl border border-neutral-800 overflow-hidden">
-            <div className="p-6 border-b border-neutral-800 flex justify-between">
-                <h3 className="font-bold text-white">Pending Verification Queue</h3>
-                <span className="bg-yellow-500/20 text-yellow-500 px-3 py-1 rounded-full text-xs font-bold">{pendingVerifications.length} Waiting</span>
-            </div>
+            <div className="p-6 border-b border-neutral-800 flex justify-between"><h3 className="font-bold text-white">Pending Verification Queue</h3><span className="bg-yellow-500/20 text-yellow-500 px-3 py-1 rounded-full text-xs font-bold">{pendingVerifications.length} Waiting</span></div>
             <table className="w-full text-left">
                 <thead className="bg-black text-neutral-500 text-xs uppercase font-bold"><tr><th className="p-4">Name</th><th className="p-4">Details</th><th className="p-4">Status</th><th className="p-4 text-right">Action</th></tr></thead>
                 <tbody className="divide-y divide-neutral-800 text-sm text-neutral-300">
@@ -142,24 +135,13 @@ const AdminPanel = ({ onLogout }) => {
         </nav>
         <button onClick={onLogout} className="text-red-500 font-bold flex items-center p-3 hover:bg-red-900/20 rounded-xl"><LogOut size={20} className="mr-3"/> Sign Out</button>
       </div>
-
       <div className="flex-1 overflow-y-auto p-8">
-          <header className="flex justify-between items-center mb-8">
-              <h1 className="text-3xl font-black text-white capitalize">{activeTab}</h1>
-              <div className="flex items-center gap-4"><Bell className="text-neutral-400"/><div className="w-10 h-10 bg-gradient-to-tr from-blue-600 to-purple-600 rounded-full"></div></div>
-          </header>
-          
-          <div className="fixed top-5 right-5 z-50 space-y-2">
-              {notifications.map(n => (
-                  <div key={n.id} className={`px-4 py-3 rounded-xl shadow-lg border flex items-center gap-2 ${n.type==='error'?'bg-red-900 border-red-500':'bg-neutral-800 border-neutral-700'}`}>{n.message}</div>
-              ))}
-          </div>
-
+          <header className="flex justify-between items-center mb-8"><h1 className="text-3xl font-black text-white capitalize">{activeTab}</h1><div className="flex items-center gap-4"><Bell className="text-neutral-400"/><div className="w-10 h-10 bg-gradient-to-tr from-blue-600 to-purple-600 rounded-full"></div></div></header>
+          <div className="fixed top-5 right-5 z-50 space-y-2">{notifications.map(n => (<div key={n.id} className={`px-4 py-3 rounded-xl shadow-lg border flex items-center gap-2 ${n.type==='error'?'bg-red-900 border-red-500':'bg-neutral-800 border-neutral-700'}`}>{n.message}</div>))}</div>
           {activeTab === 'dashboard' && <DashboardView/>}
           {activeTab === 'verification' && <VerificationView/>}
       </div>
     </div>
   );
 };
-
 export default AdminPanel;

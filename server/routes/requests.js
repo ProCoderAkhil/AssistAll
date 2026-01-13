@@ -2,31 +2,27 @@ const express = require('express');
 const router = express.Router();
 const Request = require('../models/Request');
 
-// 1. GET ALL REQUESTS (Simplified for reliability)
+// 1. GET ALL REQUESTS (Simplified)
 router.get('/', async (req, res) => {
     try {
-        // Return ALL requests sorted by newest first
-        // The frontend will handle filtering (pending vs active)
         const requests = await Request.find().sort({ createdAt: -1 });
         res.status(200).json(requests);
     } catch (err) {
-        console.error("Error fetching requests:", err);
         res.status(500).json({ message: "Server Error" });
     }
 });
 
-// 2. CREATE REQUEST (Ensures 'drop' is saved correctly)
+// 2. CREATE REQUEST
 router.post('/', async (req, res) => {
     try {
-        console.log("New Request Data:", req.body); // Debug log
         const newRequest = new Request({
             requesterName: req.body.requesterName || "User",
-            requesterId: req.body.requesterId, // Added ID tracking
+            requesterId: req.body.requesterId,
             type: req.body.type || 'Ride',
             price: req.body.price || 150,
             status: 'pending',
             pickup: req.body.pickup || "Kottayam",
-            drop: req.body.drop || "Hospital" // Ensure this matches UserDashboard payload
+            drop: req.body.drop || "Hospital"
         });
         const savedRequest = await newRequest.save();
         res.status(201).json(savedRequest);
@@ -35,7 +31,7 @@ router.post('/', async (req, res) => {
     }
 });
 
-// 3. RIDE ACTIONS (Accept, Pickup, Complete)
+// 3. RIDE ACTIONS
 router.put('/:id/:action', async (req, res) => {
     try {
         const { action } = req.params;
@@ -44,9 +40,7 @@ router.put('/:id/:action', async (req, res) => {
         if (!ride) return res.status(404).json({ message: "Not Found" });
 
         if (action === 'accept') {
-            // Prevent double booking
-            if (ride.status !== 'pending') return res.status(400).json({ message: "Ride already taken" });
-            
+            if (ride.status !== 'pending') return res.status(400).json({ message: "Taken" });
             ride.status = 'accepted';
             ride.volunteerName = req.body.volunteerName;
             ride.volunteerId = req.body.volunteerId;
