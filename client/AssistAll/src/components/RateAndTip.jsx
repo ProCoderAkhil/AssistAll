@@ -8,7 +8,7 @@ const RateAndTip = ({ requestData, onSkip, onSubmit, showToast }) => {
   const [loading, setLoading] = useState(false);
   const [paymentMode, setPaymentMode] = useState('online');
 
-  const DEPLOYED_API_URL = 'http://localhost:5000'; 
+  const DEPLOYED_API_URL = 'https://assistall-server.onrender.com'; 
   const RAZORPAY_KEY_ID = 'rzp_test_Rp78fSKZ69hMxt'; 
 
   const handleFinalSubmit = async (method) => {
