@@ -102,10 +102,10 @@ function App() {
   };
 
   // ⚠️ CRITICAL FIX: HARD RELOAD ON LOGOUT
+  // This prevents the white screen crash by forcing the browser to reload fresh
   const handleLogout = () => { 
       localStorage.clear(); 
-      setUser(null); 
-      window.location.href = "/"; // Forces a full reload to Landing Page
+      window.location.href = "/"; 
   };
 
   const handleFindVolunteer = async (bookingDetails) => { 
