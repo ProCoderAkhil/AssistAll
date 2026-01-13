@@ -26,11 +26,8 @@ const AppLoader = () => {
       <div className="relative z-10 flex flex-col items-center">
         {/* Animated Logo */}
         <div className="relative mb-12 w-32 h-32 flex items-center justify-center">
-            {/* Spinning Rings */}
             <div className="absolute inset-0 border-4 border-t-green-500 border-r-transparent border-b-green-500/30 border-l-transparent rounded-full animate-spin"></div>
             <div className="absolute inset-4 border-2 border-t-transparent border-r-blue-500 border-b-transparent border-l-blue-500/50 rounded-full animate-spin [animation-direction:reverse]"></div>
-            
-            {/* Static Shield Icon */}
             <Shield size={48} className="text-white drop-shadow-[0_0_15px_rgba(34,197,94,0.8)]" />
         </div>
 
@@ -39,26 +36,13 @@ const AppLoader = () => {
             <h2 className="text-2xl font-black text-white mb-2 tracking-tighter">
                 ASSIST<span className="text-green-500">ALL</span>
             </h2>
-            
-            {/* Status Text */}
-            <div className="h-6 mb-4">
-                <p className="text-[10px] text-green-400 font-mono uppercase tracking-widest animate-pulse">
-                    {progress < 30 ? "Initializing Core..." : progress < 70 ? "Verifying Secure Uplink..." : "Launching V10 Interface..."}
-                </p>
-            </div>
-            
-            {/* Progress Bar */}
             <div className="w-full bg-neutral-900 h-1.5 rounded-full overflow-hidden border border-neutral-800">
                 <div 
-                    className="h-full bg-gradient-to-r from-green-600 to-green-400 transition-all duration-200 ease-out shadow-[0_0_10px_#22c55e]" 
+                    className="h-full bg-gradient-to-r from-green-600 to-green-400 transition-all duration-200 ease-out" 
                     style={{ width: `${progress}%` }}
                 ></div>
             </div>
-            
-            <div className="flex justify-between text-[9px] text-gray-600 mt-2 font-mono font-bold">
-                <span>SYSTEM ONLINE</span>
-                <span>{Math.round(progress)}%</span>
-            </div>
+            <p className="text-[10px] text-gray-500 mt-2 font-mono font-bold tracking-widest">SYSTEM ONLINE {Math.round(progress)}%</p>
         </div>
       </div>
     </div>

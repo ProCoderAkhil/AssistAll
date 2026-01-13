@@ -78,13 +78,11 @@ function App() {
 
   const showToast = (msg, type = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 4000); };
 
-  // Loading Timer
   useEffect(() => { 
-      const timer = setTimeout(() => setIsLoading(false), 2500); 
+      const timer = setTimeout(() => setIsLoading(false), 2000); 
       return () => clearTimeout(timer);
   }, []);
 
-  // Auto Redirect
   useEffect(() => {
       if (!isLoading && user && (location.pathname === '/login' || location.pathname === '/' || location.pathname === '/register')) {
           if (user.role === 'admin') navigate('/admin');
@@ -93,7 +91,6 @@ function App() {
       }
   }, [user, isLoading, location.pathname, navigate]);
 
-  // Polling
   useEffect(() => {
     if (!activeRequestId || !user) return;
     const interval = setInterval(async () => {
@@ -127,10 +124,10 @@ function App() {
       else navigate('/home');
   };
 
-  // ⚠️ FORCE HARD RELOAD
   const handleLogout = () => { 
       localStorage.clear(); 
-      window.location.href = "/"; 
+      setUser(null); 
+      navigate('/'); 
   };
 
   const handleFindVolunteer = async (bookingDetails) => { 
@@ -168,7 +165,6 @@ function App() {
             <Route path="/register" element={<UserSignup onRegister={(u, t) => handleLoginSuccess(u, t)} onBack={() => navigate('/')} />} />
             <Route path="/volunteer-register" element={<VolunteerSignup onRegister={(u, t) => handleLoginSuccess(u, t)} onBack={() => navigate('/')} />} />
 
-            {/* PROTECTED ROUTES */}
             <Route path="/home" element={user && user.role === 'user' ? (
                 <>
                     <div className="absolute inset-0 z-0"><MapBackground activeRequest={acceptedRequestData} /></div>

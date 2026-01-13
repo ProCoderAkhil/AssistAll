@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
-// Import marker images directly
+// Import marker images directly to avoid 404s
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 
@@ -30,29 +30,29 @@ const MapBackground = ({ activeRequest }) => {
   const userPos = activeRequest?.location ? [activeRequest.location.lat, activeRequest.location.lng] : defaultPos;
   const [volPos, setVolPos] = useState([9.5940, 76.5240]); 
 
-  // --- SAFE ICON DEFINITIONS (Inside Component) ---
-  const UserIcon = new L.Icon({
-      iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
-      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-      iconSize: [25, 41],
-      iconAnchor: [12, 41],
-      popupAnchor: [1, -34]
-  });
-
-  const VolunteerIcon = new L.Icon({
-      iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
-      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-      iconSize: [25, 41],
-      iconAnchor: [12, 41],
-      popupAnchor: [1, -34]
-  });
-
-  const CarIcon = L.divIcon({
-      html: '<div style="font-size: 24px;">🚖</div>',
-      className: 'dummy', // Dummy class to prevent default styling
-      iconSize: [30, 30],
-      iconAnchor: [15, 15]
-  });
+  // --- SAFE ICON DEFINITIONS (Created inside component to prevent crash) ---
+  const icons = useMemo(() => ({
+      user: new L.Icon({
+          iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
+          shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+          iconSize: [25, 41],
+          iconAnchor: [12, 41],
+          popupAnchor: [1, -34]
+      }),
+      volunteer: new L.Icon({
+          iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
+          shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+          iconSize: [25, 41],
+          iconAnchor: [12, 41],
+          popupAnchor: [1, -34]
+      }),
+      car: L.divIcon({
+          html: '<div style="font-size: 24px;">🚖</div>',
+          className: 'dummy',
+          iconSize: [30, 30],
+          iconAnchor: [15, 15]
+      })
+  }), []);
 
   // Animation Logic
   useEffect(() => {
@@ -81,13 +81,13 @@ const MapBackground = ({ activeRequest }) => {
         <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
         <MapController location={userPos} />
 
-        <Marker position={userPos} icon={UserIcon}>
+        <Marker position={userPos} icon={icons.user}>
           <Popup>Customer Location</Popup>
         </Marker>
 
         {activeRequest && (
             <>
-                <Marker position={volPos} icon={activeRequest.status === 'in_progress' ? CarIcon : VolunteerIcon}>
+                <Marker position={volPos} icon={activeRequest.status === 'in_progress' ? icons.car : icons.volunteer}>
                     <Popup>{activeRequest.volunteerName || "Volunteer"}</Popup>
                 </Marker>
                 <Polyline positions={[volPos, userPos]} color="blue" dashArray="10, 10" opacity={0.5} />
