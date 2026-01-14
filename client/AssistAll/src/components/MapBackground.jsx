@@ -6,7 +6,6 @@ import L from 'leaflet';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 
-// Fix Leaflet's default icon path issues
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({ iconUrl: markerIcon, shadowUrl: markerShadow });
 
@@ -21,7 +20,7 @@ const MapBackground = ({ activeRequest }) => {
   const userPos = activeRequest?.location ? [activeRequest.location.lat, activeRequest.location.lng] : defaultPos;
   const [volPos, setVolPos] = useState([9.5940, 76.5240]); 
 
-  // ✅ FIX: Icons defined SAFELY inside component
+  // ✅ FIX: Icons defined INSIDE component using useMemo to prevent load-time crashes
   const icons = useMemo(() => ({
       user: new L.Icon({
           iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
