@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline } from 'react-
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
-// Import marker images directly to avoid missing asset errors
+// Import marker images directly
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 
@@ -30,7 +30,7 @@ const MapBackground = ({ activeRequest }) => {
   const userPos = activeRequest?.location ? [activeRequest.location.lat, activeRequest.location.lng] : defaultPos;
   const [volPos, setVolPos] = useState([9.5940, 76.5240]); 
 
-  // ✅ FIX: Define icons inside the component using useMemo to prevent load crashes
+  // ✅ FIX: Define icons safely inside the component using useMemo
   const icons = useMemo(() => ({
       user: new L.Icon({
           iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png',
@@ -54,7 +54,7 @@ const MapBackground = ({ activeRequest }) => {
       })
   }), []);
 
-  // Animation Logic: Move Volunteer to User
+  // Animation Logic
   useEffect(() => {
       if (activeRequest && (activeRequest.status === 'accepted' || activeRequest.status === 'in_progress')) {
           const interval = setInterval(() => {
@@ -65,10 +65,9 @@ const MapBackground = ({ activeRequest }) => {
                   // Stop if close enough
                   if (Math.abs(latDiff) < 0.0001 && Math.abs(lngDiff) < 0.0001) return prev;
 
-                  // Move 5% closer every tick
                   return [prev[0] + latDiff * 0.05, prev[1] + lngDiff * 0.05];
               });
-          }, 500); // Update every 500ms
+          }, 500); 
           return () => clearInterval(interval);
       }
   }, [activeRequest, userPos]);
@@ -86,16 +85,17 @@ const MapBackground = ({ activeRequest }) => {
         
         <MapController location={userPos} />
 
+        {/* User Marker */}
         <Marker position={userPos} icon={icons.user}>
           <Popup>Customer Location</Popup>
         </Marker>
 
+        {/* Volunteer Marker */}
         {activeRequest && (
             <>
                 <Marker position={volPos} icon={activeRequest.status === 'in_progress' ? icons.car : icons.volunteer}>
                     <Popup>{activeRequest.volunteerName || "Volunteer"}</Popup>
                 </Marker>
-                {/* Route Line */}
                 <Polyline positions={[volPos, userPos]} color="blue" dashArray="10, 10" opacity={0.5} />
             </>
         )}

@@ -15,16 +15,14 @@ const UserSchema = new mongoose.Schema({
       default: 'general' 
   },
   
-  // Verification Documents
-  govtId: { type: String }, // Common for all
-  drivingLicense: { type: String }, // For Transport
-  medicalCertificate: { type: String }, // For Medical
+  govtId: { type: String }, 
+  drivingLicense: { type: String }, 
+  medicalCertificate: { type: String }, 
   
-  // Vehicle Info (For Transport)
   vehicleDetails: {
-      type: { type: String }, // Car, Bike, Auto
-      model: { type: String }, // e.g., Swift Dzire
-      number: { type: String } // KL-01-AB-1234
+      type: { type: String },
+      model: { type: String },
+      number: { type: String }
   },
 
   isVerified: { type: Boolean, default: false }, 

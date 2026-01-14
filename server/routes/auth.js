@@ -18,12 +18,11 @@ router.post('/register', async (req, res) => {
 
     let isVerified = false;
     
-    // Volunteer Verification Logic
     if (role === 'volunteer') {
         if (!adminCode) return res.status(400).json({ message: 'Verification Code Required' });
         const validCode = await AccessCode.findOne({ code: adminCode });
         if (!validCode) return res.status(400).json({ message: 'Invalid Verification Code' });
-        isVerified = false; // Pending manual approval
+        isVerified = false; 
     }
 
     const salt = await bcrypt.genSalt(10);
@@ -33,7 +32,6 @@ router.post('/register', async (req, res) => {
       name, email, password: hashedPassword, role,
       govtId, address, phone,
       
-      // New Fields
       serviceSector: serviceSector || 'general',
       drivingLicense: drivingLicense || '',
       medicalCertificate: medicalCertificate || '',
@@ -82,7 +80,6 @@ router.post('/login', async (req, res) => {
     } catch (err) { res.status(500).json({ message: 'Server Error' }); }
 });
 
-// PUBLIC PROFILE
 router.get('/user/:id', async (req, res) => {
     try {
         const user = await User.findById(req.params.id).select('-password -adminCode');
