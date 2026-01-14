@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Shield, Check, X, LogOut, Users, FileText, Search, LayoutDashboard, 
-  Bell, Activity, Lock, Eye, AlertTriangle, MapPin, Menu, Phone, Calendar
+  Bell, Activity, Lock, Eye, AlertTriangle, MapPin, Menu, Phone, Calendar,
+  ChevronRight, CheckCircle, Clock // ✅ Added Missing Imports
 } from 'lucide-react';
 
 const DEPLOYED_API_URL = window.location.hostname === 'localhost' 
@@ -164,7 +165,7 @@ const AdminPanel = ({ onLogout }) => {
                 </div>
             )}
 
-            {/* --- VERIFICATION VIEW (Pending Request Fix) --- */}
+            {/* --- VERIFICATION VIEW (Detailed) --- */}
             {activeTab === 'verification' && (
                 <div className="flex gap-8 h-[calc(100vh-140px)] animate-in fade-in">
                     {/* List */}
@@ -184,6 +185,7 @@ const AdminPanel = ({ onLogout }) => {
                                         <h4 className={`font-bold text-sm ${selectedVol?._id === v._id ? 'text-white' : 'text-gray-200'}`}>{v.name}</h4>
                                         <p className="text-[10px] text-gray-600">{v.email}</p>
                                     </div>
+                                    <ChevronRight size={16} className={selectedVol?._id === v._id ? 'text-white' : 'text-gray-600'}/>
                                 </div>
                             ))}
                             {pendingVolunteers.length === 0 && <div className="p-8 text-center text-gray-600 text-sm">No pending requests.</div>}
@@ -207,28 +209,43 @@ const AdminPanel = ({ onLogout }) => {
 
                                 <div className="grid grid-cols-2 gap-6 mb-8 flex-1 overflow-y-auto">
                                     <div className="space-y-2">
-                                        <p className="text-xs font-bold text-blue-500 uppercase">Govt ID</p>
-                                        <div className="w-full h-48 bg-black rounded-xl border border-white/10 flex items-center justify-center text-gray-600"><span className="text-xs font-mono">{selectedVol.govtId}</span></div>
+                                        <p className="text-xs font-bold text-blue-500 uppercase">Documents</p>
+                                        <div className="bg-[#050505] p-4 rounded-xl border border-white/10 text-center">
+                                            <span className="text-xs text-gray-400 block mb-2">Govt ID: {selectedVol.govtId}</span>
+                                            <span className="text-xs text-green-400 font-bold">Uploaded</span>
+                                        </div>
                                     </div>
+                                    
                                     <div className="space-y-2">
-                                        <p className="text-xs font-bold text-green-500 uppercase">Live Selfie</p>
-                                        <div className="w-full h-48 bg-black rounded-xl border border-white/10 flex items-center justify-center overflow-hidden">
-                                            {selectedVol.selfieImage ? <img src={selectedVol.selfieImage} className="w-full h-full object-cover" alt="Selfie"/> : <span className="text-xs text-gray-600">No Image</span>}
+                                        <p className="text-xs font-bold text-green-500 uppercase">Selfie Match</p>
+                                        <div className="w-full h-32 bg-black rounded-xl border border-white/10 flex items-center justify-center overflow-hidden">
+                                            {selectedVol.selfieImage ? <img src={selectedVol.selfieImage} className="w-full h-full object-cover" alt="Selfie"/> : "No Image"}
                                         </div>
                                     </div>
-                                    {/* Google Meet Link */}
-                                    <div className="col-span-2 bg-blue-900/10 p-4 rounded-xl border border-blue-500/20 flex justify-between items-center">
+
+                                    {/* Interview Status Indicator */}
+                                    <div className="col-span-2 bg-[#1a1a1a] p-4 rounded-xl border border-white/5 flex justify-between items-center">
                                         <div>
-                                            <p className="text-xs font-bold text-blue-400 uppercase">Step 2: Interview</p>
-                                            <p className="text-sm text-gray-300">Schedule a quick video call to verify details.</p>
+                                            <p className="text-xs font-bold text-gray-500 uppercase">Interview Status</p>
+                                            {selectedVol.interviewStatus === 'completed' ? (
+                                                <p className="text-green-500 font-bold flex items-center gap-2 mt-1"><CheckCircle size={16}/> Code Verified</p>
+                                            ) : (
+                                                <p className="text-yellow-500 font-bold flex items-center gap-2 mt-1"><Clock size={16}/> Pending Interview</p>
+                                            )}
                                         </div>
-                                        <button className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold text-xs hover:bg-blue-500 transition">Open Google Meet</button>
+                                        <a href="https://meet.google.com/hva-psuy-qds" target="_blank" rel="noreferrer" className="text-blue-500 text-xs font-bold hover:underline">Join Meet</a>
                                     </div>
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-4 mt-auto">
-                                    <button onClick={() => handleDecision(selectedVol._id, 'rejected')} className="py-4 rounded-xl border border-red-900/50 text-red-500 font-bold hover:bg-red-900/10 transition uppercase text-sm tracking-widest">Reject</button>
-                                    <button onClick={() => handleDecision(selectedVol._id, 'approved')} className="py-4 rounded-xl bg-green-600 text-black font-bold hover:bg-green-500 transition uppercase text-sm tracking-widest">Approve Volunteer</button>
+                                    <button onClick={() => handleDecision(selectedVol._id, 'rejected')} className="py-4 rounded-xl border border-red-900/50 text-red-500 font-bold">Reject</button>
+                                    <button 
+                                        onClick={() => handleDecision(selectedVol._id, 'approved')} 
+                                        className={`py-4 rounded-xl font-bold text-black ${selectedVol.interviewStatus === 'completed' ? 'bg-green-600 hover:bg-green-500' : 'bg-gray-600 cursor-not-allowed'}`}
+                                        disabled={selectedVol.interviewStatus !== 'completed'}
+                                    >
+                                        {selectedVol.interviewStatus === 'completed' ? "Approve & Unlock" : "Wait for Interview"}
+                                    </button>
                                 </div>
                             </>
                         ) : (

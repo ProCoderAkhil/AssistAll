@@ -42,13 +42,13 @@ router.post('/register', async (req, res) => {
       vehicleDetails: vehicleDetails || {},
 
       // Status Logic
-      isVerified: role === 'user' ? true : false, // Users verified by default, Volunteers need admin
-      verificationStatus: role === 'volunteer' ? 'pending' : 'approved'
+      isVerified: role === 'user' ? true : false, 
+      verificationStatus: role === 'volunteer' ? 'pending' : 'approved',
+      interviewStatus: 'pending' // Default
     });
 
     await user.save();
     
-    // Create Token
     const token = jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '30d' });
 
     res.status(201).json({ 
@@ -105,12 +105,12 @@ router.get('/pending-volunteers', async (req, res) => {
         const users = await User.find({ 
             role: 'volunteer', 
             verificationStatus: 'pending' 
-        }).select('-password'); // Exclude password for security
+        }).select('-password');
         res.json(users);
     } catch (err) { res.status(500).json({ message: "Server Error" }); }
 });
 
-// --- 4. ADMIN: Verify Volunteer ---
+// --- 4. ADMIN: Verify Volunteer (Final Approval) ---
 router.put('/verify/:id', async (req, res) => {
     try {
         const { status } = req.body; // 'approved' or 'rejected'
@@ -125,15 +125,24 @@ router.put('/verify/:id', async (req, res) => {
     } catch (err) { res.status(500).json({ message: "Server Error" }); }
 });
 
-// --- 5. VOLUNTEER: Schedule Interview (Step 4 of Signup) ---
-router.put('/schedule-interview/:id', async (req, res) => {
+// --- 5. VOLUNTEER: Complete Live Interview (Enter Code) ---
+router.put('/complete-interview/:id', async (req, res) => {
     try {
-        const { interviewDate } = req.body;
+        const { adminCode } = req.body;
+        
+        // 🔒 SECRET CODE (Admin gives this verbally on Google Meet)
+        const VALID_ADMIN_CODE = "VERIFIED24"; 
+
+        if (adminCode !== VALID_ADMIN_CODE) {
+            return res.status(400).json({ message: "Invalid Code. Ask Admin." });
+        }
+
+        // Update status so Admin sees 'Code Verified' in dashboard
         await User.findByIdAndUpdate(req.params.id, { 
-            interviewDate: interviewDate,
-            verificationStatus: 'interview_scheduled'
+            interviewStatus: 'completed' 
         });
-        res.json({ message: "Interview Scheduled" });
+        
+        res.json({ message: "Interview Verified" });
     } catch (err) {
         res.status(500).json({ message: "Server Error" });
     }

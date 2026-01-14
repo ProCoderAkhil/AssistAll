@@ -27,8 +27,8 @@ const UserSchema = new mongoose.Schema({
   agreedToTerms: { type: Boolean, default: false },
   
   // Documents & Verification
-  selfieImage: { type: String }, // Stores Base64 string (Large payload)
-  govtId: { type: String },      // File name or URL
+  selfieImage: { type: String }, // Stores Base64 string
+  govtId: { type: String },      
   drivingLicense: { type: String }, 
   serviceSector: { 
       type: String, 
@@ -42,16 +42,21 @@ const UserSchema = new mongoose.Schema({
   },
 
   // --- ADMIN / VERIFICATION STATUS ---
-  isVerified: { type: Boolean, default: false }, 
+  isVerified: { type: Boolean, default: false }, // Final Lock
+  
+  // Verification Stages
   verificationStatus: { 
     type: String, 
-    enum: ['pending', 'interview_scheduled', 'approved', 'rejected'], 
+    enum: ['pending', 'approved', 'rejected'], 
     default: 'pending' 
   },
   
   // Interview Logic
-  interviewDate: { type: Date },
-  googleMeetLink: { type: String, default: "https://meet.google.com/abc-defg-hij" }, // Default link for demo
+  interviewStatus: {
+      type: String,
+      enum: ['pending', 'completed'], // 'completed' means code was entered correctly
+      default: 'pending'
+  },
 
   createdAt: { type: Date, default: Date.now },
 });
