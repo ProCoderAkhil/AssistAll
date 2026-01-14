@@ -16,12 +16,10 @@ router.get('/', async (req, res) => {
     } catch (err) { res.status(500).json({ message: "Server Error" }); }
 });
 
-// CREATE REQUEST (Generate OTP)
+// CREATE REQUEST
 router.post('/', async (req, res) => {
     try {
-        // ✅ NEW: Generate 4-digit OTP
         const otp = Math.floor(1000 + Math.random() * 9000).toString();
-        
         const newRequest = new Request({
             ...req.body,
             pickupOTP: otp
@@ -31,14 +29,19 @@ router.post('/', async (req, res) => {
     } catch (err) { res.status(500).json({ message: err.message }); }
 });
 
-// UPDATE STATUS (With OTP Check)
+// UPDATE STATUS (Handle Accept, Pickup, Complete, Cancel, Rate)
 router.put('/:id/:action', async (req, res) => {
     try {
         const { action } = req.params;
-        const { volunteerId, volunteerName, otp } = req.body; // Receive OTP
+        const { volunteerId, volunteerName, otp, rating, review } = req.body;
         const request = await Request.findById(req.params.id);
 
         if (!request) return res.status(404).json({ message: "Request not found" });
+
+        // LOGIC CHECK: Prevent double booking
+        if (action === 'accept' && request.status !== 'pending') {
+            return res.status(409).json({ message: "Ride already taken by another volunteer" });
+        }
 
         if (action === 'accept') {
             request.status = 'accepted';
@@ -46,14 +49,19 @@ router.put('/:id/:action', async (req, res) => {
             request.volunteerName = volunteerName;
         } 
         else if (action === 'pickup') {
-            // ✅ NEW: Verify OTP
-            if (request.pickupOTP !== otp) {
-                return res.status(400).json({ message: "Incorrect OTP" });
-            }
+            if (request.pickupOTP !== otp) return res.status(400).json({ message: "Incorrect OTP" });
             request.status = 'in_progress';
         } 
         else if (action === 'complete') {
             request.status = 'completed';
+        }
+        else if (action === 'cancel') {
+            request.status = 'cancelled';
+        }
+        else if (action === 'rate') {
+            // New Rating Logic
+            request.rating = rating;
+            request.review = review;
         }
 
         await request.save();

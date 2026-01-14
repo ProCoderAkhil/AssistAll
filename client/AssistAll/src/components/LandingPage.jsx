@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { 
   ArrowRight, ChevronDown, Car, Shield, Heart, MapPin, 
   Users, Activity, Phone, Mail, Globe, Star, CheckCircle, 
@@ -12,29 +12,58 @@ const LandingPage = ({ onGetStarted, onVolunteerJoin }) => {
   const [scrollY, setScrollY] = useState(0);
   const [activeFaq, setActiveFaq] = useState(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  
+  // ✅ FIX: Ref for the scrollable container
+  const containerRef = useRef(null);
+
+  const navItems = [
+    { name: 'Home', id: 'home' },
+    { name: 'Services', id: 'services' },
+    { name: 'Volunteer', id: 'volunteer' },
+    { name: 'FAQ', id: 'faq' },
+    { name: 'Contact', id: 'contact' }
+  ];
 
   useEffect(() => {
-    const handleScroll = () => setScrollY(window.scrollY);
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    const handleScroll = () => {
+        if (containerRef.current) {
+            setScrollY(containerRef.current.scrollTop);
+        }
+    };
+
+    const container = containerRef.current;
+    if (container) {
+        container.addEventListener('scroll', handleScroll);
+    }
+    return () => {
+        if (container) container.removeEventListener('scroll', handleScroll);
+    };
   }, []);
 
+  // ✅ FIX: Scroll the specific container, not the window
   const smoothScroll = (id) => {
     setIsMobileMenuOpen(false); 
     const element = document.getElementById(id);
-    if (element) {
-        const offset = 80; 
-        const elementPosition = element.getBoundingClientRect().top + window.pageYOffset;
-        const offsetPosition = elementPosition - offset;
-        window.scrollTo({ top: offsetPosition, behavior: 'smooth' });
+    const container = containerRef.current;
+
+    if (element && container) {
+        // Calculate position relative to the container
+        const offset = 80; // Navbar height
+        const elementTop = element.offsetTop;
+        
+        container.scrollTo({
+            top: elementTop - offset,
+            behavior: 'smooth'
+        });
     }
   };
 
   const toggleFaq = (index) => setActiveFaq(activeFaq === index ? null : index);
-  const handleContactSubmit = () => alert("Message Sent! We will contact you shortly.");
+  const handleContactSubmit = (e) => { e.preventDefault(); alert("Message Sent! We will contact you shortly."); };
 
   return (
-    <div className="min-h-screen bg-black text-white font-sans overflow-x-hidden selection:bg-green-500 selection:text-black">
+    // ✅ FIX: Added h-screen and overflow-y-auto to allow scrolling within the App's fixed layout
+    <div ref={containerRef} className="h-screen w-full bg-black text-white font-sans overflow-y-auto overflow-x-hidden selection:bg-green-500 selection:text-black relative scroll-smooth">
       
       {/* Background */}
       <div className="fixed inset-0 z-0 pointer-events-none">
@@ -50,8 +79,8 @@ const LandingPage = ({ onGetStarted, onVolunteerJoin }) => {
         </div>
         
         <div className="hidden md:flex gap-1 text-sm font-medium bg-white/5 p-1 rounded-full border border-white/5 backdrop-blur-md">
-            {['Home', 'Services', 'Volunteer', 'FAQ', 'Contact'].map((item) => (
-                <button key={item} onClick={() => smoothScroll(item.toLowerCase())} className="px-5 py-2 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition">{item}</button>
+            {navItems.map((item) => (
+                <button key={item.name} onClick={() => smoothScroll(item.id)} className="px-5 py-2 rounded-full text-gray-400 hover:text-white hover:bg-white/10 transition">{item.name}</button>
             ))}
         </div>
 
@@ -67,8 +96,8 @@ const LandingPage = ({ onGetStarted, onVolunteerJoin }) => {
 
       {isMobileMenuOpen && (
           <div className="fixed inset-0 z-40 bg-black/95 backdrop-blur-xl pt-24 px-6 flex flex-col gap-6 md:hidden animate-in slide-in-from-top-10">
-              {['Home', 'Services', 'Volunteer', 'FAQ', 'Contact'].map((item) => (
-                  <button key={item} onClick={() => smoothScroll(item.toLowerCase())} className="text-2xl font-bold text-left text-gray-300 hover:text-white border-b border-white/10 pb-4">{item}</button>
+              {navItems.map((item) => (
+                  <button key={item.name} onClick={() => smoothScroll(item.id)} className="text-2xl font-bold text-left text-gray-300 hover:text-white border-b border-white/10 pb-4">{item.name}</button>
               ))}
               <div className="flex flex-col gap-4 mt-4">
                   <button onClick={onGetStarted} className="w-full bg-[#1a1a1a] text-white py-4 rounded-xl font-bold border border-white/10">Log In</button>
@@ -190,13 +219,15 @@ const LandingPage = ({ onGetStarted, onVolunteerJoin }) => {
               <div className="bg-neutral-900 p-8 rounded-3xl border border-white/10 shadow-2xl">
                   <h3 className="text-xl font-bold mb-6 flex items-center gap-2"><MessageSquare size={20} className="text-green-500"/> Send Message</h3>
                   <div className="space-y-4">
-                      <div className="grid grid-cols-2 gap-4">
-                          <input type="text" placeholder="First Name" className="w-full bg-black border border-white/10 rounded-xl p-4 text-white focus:border-green-500 outline-none transition"/>
-                          <input type="text" placeholder="Last Name" className="w-full bg-black border border-white/10 rounded-xl p-4 text-white focus:border-green-500 outline-none transition"/>
-                      </div>
-                      <input type="email" placeholder="Email Address" className="w-full bg-black border border-white/10 rounded-xl p-4 text-white focus:border-green-500 outline-none transition"/>
-                      <textarea rows="4" placeholder="How can we help?" className="w-full bg-black border border-white/10 rounded-xl p-4 text-white focus:border-green-500 outline-none transition resize-none"></textarea>
-                      <button onClick={handleContactSubmit} className="w-full bg-green-600 hover:bg-green-500 text-black font-bold py-4 rounded-xl transition flex items-center justify-center gap-2">Send Message <Send size={18}/></button>
+                      <form onSubmit={handleContactSubmit}>
+                        <div className="grid grid-cols-2 gap-4 mb-4">
+                            <input type="text" placeholder="First Name" className="w-full bg-black border border-white/10 rounded-xl p-4 text-white focus:border-green-500 outline-none transition"/>
+                            <input type="text" placeholder="Last Name" className="w-full bg-black border border-white/10 rounded-xl p-4 text-white focus:border-green-500 outline-none transition"/>
+                        </div>
+                        <input type="email" placeholder="Email Address" className="w-full bg-black border border-white/10 rounded-xl p-4 text-white focus:border-green-500 outline-none transition mb-4"/>
+                        <textarea rows="4" placeholder="How can we help?" className="w-full bg-black border border-white/10 rounded-xl p-4 text-white focus:border-green-500 outline-none transition resize-none mb-4"></textarea>
+                        <button type="submit" className="w-full bg-green-600 hover:bg-green-500 text-black font-bold py-4 rounded-xl transition flex items-center justify-center gap-2">Send Message <Send size={18}/></button>
+                      </form>
                   </div>
               </div>
           </div>

@@ -1,223 +1,278 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  LayoutDashboard, Users, Car, Settings, LogOut, 
-  Shield, Bell, CheckCircle, XCircle, RefreshCw, 
-  MapPin, Phone, Mail, FileText, Stethoscope, Video, X, Eye
+  Shield, Check, X, LogOut, Users, FileText, Search, LayoutDashboard, 
+  Bell, Activity, Lock, Eye, AlertTriangle, MapPin, Menu 
 } from 'lucide-react';
+
+const DEPLOYED_API_URL = window.location.hostname === 'localhost' 
+    ? 'http://localhost:5000' 
+    : 'https://assistall-server.onrender.com';
 
 const AdminPanel = ({ onLogout }) => {
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [stats, setStats] = useState({ volunteers: 0, users: 0, rides: 0, earnings: 0 });
   const [volunteers, setVolunteers] = useState([]);
-  const [pendingVerifications, setPendingVerifications] = useState([]);
-  const [generatedCode, setGeneratedCode] = useState("------"); 
-  
-  // 🔍 SELECTED VOLUNTEER STATE (For Detail Modal)
   const [selectedVol, setSelectedVol] = useState(null);
+  const [stats, setStats] = useState({ totalUsers: 0, activeRides: 0, pendingVerifications: 0, sosAlerts: 0 });
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  const DEPLOYED_API_URL = window.location.hostname === 'localhost' 
-      ? 'http://localhost:5000' 
-      : 'https://assistall-server.onrender.com';
+  useEffect(() => {
+    fetchPendingVolunteers();
+    // Simulate fetching stats
+    setStats({ totalUsers: 1240, activeRides: 45, pendingVerifications: 12, sosAlerts: 3 });
+  }, []);
 
-  // --- FETCH DATA ---
-  const fetchData = async () => {
+  const fetchPendingVolunteers = async () => {
     try {
-        const resStats = await fetch(`${DEPLOYED_API_URL}/api/admin/stats`);
-        if(resStats.ok) setStats(await resStats.json());
-
-        const resVol = await fetch(`${DEPLOYED_API_URL}/api/admin/volunteers`);
-        if(resVol.ok) {
-            const data = await resVol.json();
+        const res = await fetch(`${DEPLOYED_API_URL}/api/auth/pending-volunteers`); 
+        if (res.ok) {
+            const data = await res.json();
             setVolunteers(data);
-            setPendingVerifications(data.filter(v => !v.isVerified));
+            setStats(prev => ({ ...prev, pendingVerifications: data.length }));
         }
-
-        const resCode = await fetch(`${DEPLOYED_API_URL}/api/admin/code`);
-        if(resCode.ok) {
-            const data = await resCode.json();
-            if(data.code) setGeneratedCode(data.code);
-        }
-    } catch (error) {}
+    } catch (e) { console.error(e); }
   };
 
-  useEffect(() => { fetchData(); }, [activeTab]);
-
-  // --- ACTIONS ---
-  const generateCode = async () => {
-    try {
-        const res = await fetch(`${DEPLOYED_API_URL}/api/admin/generate-code`, { method: 'POST' });
-        const data = await res.json();
-        if (res.ok) setGeneratedCode(data.code);
-    } catch(e) { alert("Error"); }
-  };
-
-  const approveVolunteer = async (id) => {
+  const handleDecision = async (id, status) => {
       try {
-          await fetch(`${DEPLOYED_API_URL}/api/admin/verify/${id}`, { method: 'PUT' });
-          fetchData();
-          setSelectedVol(null); // Close modal if open
-      } catch(e) { alert("Failed"); }
+          await fetch(`${DEPLOYED_API_URL}/api/auth/verify/${id}`, {
+              method: 'PUT',
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ status })
+          });
+          setVolunteers(prev => prev.filter(v => v._id !== id));
+          setSelectedVol(null);
+          alert(`Volunteer ${status === 'approved' ? 'Verified' : 'Rejected'}`);
+          fetchPendingVolunteers(); // Refresh counts
+      } catch (e) { alert("Action Failed"); }
   };
 
-  // --- VIEWS ---
+  // --- SUB-COMPONENTS ---
 
-  const VolunteerDetailModal = () => {
-      if (!selectedVol) return null;
-      return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-              <div className="bg-[#121212] w-full max-w-2xl rounded-3xl border border-neutral-800 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-                  
-                  {/* Header */}
-                  <div className="p-6 border-b border-neutral-800 flex justify-between items-start bg-[#1a1a1a]">
-                      <div className="flex items-center gap-4">
-                          <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full flex items-center justify-center text-2xl font-bold text-white shadow-lg border-2 border-white/10">
-                              {selectedVol.name.charAt(0)}
-                          </div>
-                          <div>
-                              <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                                  {selectedVol.name}
-                                  {selectedVol.isVerified && <CheckCircle size={20} className="text-green-500"/>}
-                              </h2>
-                              <div className="flex gap-2 mt-1">
-                                  {selectedVol.isGeriatricTrained && (
-                                      <span className="text-[10px] bg-green-500/10 text-green-400 px-2 py-0.5 rounded border border-green-500/20 font-bold flex items-center gap-1">
-                                          <Stethoscope size={10}/> GERIATRIC PRO
-                                      </span>
-                                  )}
-                                  <span className="text-[10px] bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded border border-blue-500/20 font-bold uppercase">
-                                      {selectedVol.role}
-                                  </span>
-                              </div>
-                          </div>
-                      </div>
-                      <button onClick={() => setSelectedVol(null)} className="p-2 bg-neutral-800 rounded-full text-neutral-400 hover:text-white hover:bg-red-500 transition"><X size={20}/></button>
-                  </div>
+  const SidebarItem = ({ id, icon: Icon, label, count }) => (
+      <button 
+        onClick={() => setActiveTab(id)}
+        className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all duration-200 ${activeTab === id ? 'bg-green-600 text-white shadow-lg shadow-green-900/20' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
+      >
+          <Icon size={20} />
+          <span className="font-bold text-sm flex-1 text-left">{label}</span>
+          {count > 0 && <span className="bg-white/20 text-white text-[10px] font-black px-2 py-0.5 rounded-full">{count}</span>}
+      </button>
+  );
 
-                  {/* Body */}
-                  <div className="p-8 overflow-y-auto space-y-8">
-                      
-                      {/* Contact Info */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          <div className="space-y-4">
-                              <h3 className="text-xs font-bold text-neutral-500 uppercase tracking-widest border-b border-neutral-800 pb-2">Contact Details</h3>
-                              <div className="flex items-center gap-3 text-neutral-300"><Mail size={18} className="text-blue-500"/> {selectedVol.email}</div>
-                              <div className="flex items-center gap-3 text-neutral-300"><Phone size={18} className="text-green-500"/> {selectedVol.phone || "N/A"}</div>
-                              <div className="flex items-center gap-3 text-neutral-300"><MapPin size={18} className="text-red-500"/> {selectedVol.address || "N/A"}</div>
-                          </div>
-
-                          <div className="space-y-4">
-                              <h3 className="text-xs font-bold text-neutral-500 uppercase tracking-widest border-b border-neutral-800 pb-2">Documents</h3>
-                              
-                              <div className="flex items-center justify-between bg-neutral-900 p-3 rounded-xl border border-neutral-800">
-                                  <div className="flex items-center gap-3">
-                                      <div className="bg-neutral-800 p-2 rounded-lg"><FileText size={18} className="text-white"/></div>
-                                      <div><p className="text-sm font-bold text-white">Govt ID Proof</p><p className="text-xs text-neutral-500">{selectedVol.govtId || "Pending"}</p></div>
-                                  </div>
-                                  <button className="text-xs font-bold text-blue-400 hover:text-blue-300 border border-blue-500/30 px-3 py-1.5 rounded-lg">View</button>
-                              </div>
-
-                              {selectedVol.isGeriatricTrained && (
-                                  <div className="flex items-center justify-between bg-green-900/10 p-3 rounded-xl border border-green-500/20">
-                                      <div className="flex items-center gap-3">
-                                          <div className="bg-green-500/20 p-2 rounded-lg"><Stethoscope size={18} className="text-green-500"/></div>
-                                          <div><p className="text-sm font-bold text-white">Training Cert</p><p className="text-xs text-neutral-500">{selectedVol.trainingCertificate || "Uploaded"}</p></div>
-                                      </div>
-                                      <button className="text-xs font-bold text-green-400 hover:text-green-300 border border-green-500/30 px-3 py-1.5 rounded-lg">View</button>
-                                  </div>
-                              )}
-                          </div>
-                      </div>
-
-                      {/* Verification Status Area */}
-                      <div className="bg-neutral-900 p-6 rounded-2xl border border-neutral-800 text-center">
-                          <h3 className="text-sm font-bold text-white mb-2">Verification Status</h3>
-                          <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold mb-4 ${selectedVol.isVerified ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-500'}`}>
-                              {selectedVol.isVerified ? <CheckCircle size={16}/> : <RefreshCw size={16} className="animate-spin"/>}
-                              {selectedVol.isVerified ? "APPROVED & ACTIVE" : "PENDING INTERVIEW"}
-                          </div>
-                          
-                          {!selectedVol.isVerified && (
-                              <div className="flex gap-3 justify-center">
-                                  <button className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition">
-                                      <Video size={18}/> Start Video Interview
-                                  </button>
-                                  <button onClick={() => approveVolunteer(selectedVol._id)} className="bg-green-600 hover:bg-green-500 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition">
-                                      <CheckCircle size={18}/> Approve Now
-                                  </button>
-                              </div>
-                          )}
-                          
-                          {selectedVol.isVerified && (
-                              <button onClick={() => approveVolunteer(selectedVol._id)} className="text-red-500 text-sm font-bold hover:underline">Revoke Verification</button>
-                          )}
-                      </div>
-
-                  </div>
-              </div>
+  const StatCard = ({ icon: Icon, label, value, color }) => (
+      <div className="bg-[#1a1a1a] p-6 rounded-2xl border border-white/5 relative overflow-hidden group hover:border-white/10 transition">
+          <div className={`absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition transform group-hover:scale-110 ${color}`}>
+              <Icon size={64} />
           </div>
-      );
-  };
+          <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-4 ${color.replace('text-', 'bg-').replace('500', '500/20')} ${color}`}>
+              <Icon size={24} />
+          </div>
+          <p className="text-gray-500 text-xs font-bold uppercase tracking-widest">{label}</p>
+          <h3 className="text-3xl font-black text-white mt-1">{value}</h3>
+      </div>
+  );
 
   return (
-    <div className="min-h-screen bg-black font-sans flex text-gray-100 overflow-hidden">
-      
-      {/* Sidebar */}
-      <div className="w-64 bg-[#0a0a0a] border-r border-neutral-800 p-6 flex flex-col hidden lg:flex">
-        <div className="flex items-center mb-10 text-white font-black text-xl gap-2"><Shield className="text-blue-500" fill="currentColor"/> Admin Panel</div>
-        <nav className="space-y-2 flex-1">
-            <button onClick={() => setActiveTab('dashboard')} className={`w-full flex items-center p-3 rounded-xl font-bold transition ${activeTab==='dashboard'?'bg-blue-600 text-white':'text-neutral-400 hover:bg-white/5'}`}><LayoutDashboard size={20} className="mr-3"/> Dashboard</button>
-            <button onClick={() => setActiveTab('verification')} className={`w-full flex items-center p-3 rounded-xl font-bold transition ${activeTab==='verification'?'bg-blue-600 text-white':'text-neutral-400 hover:bg-white/5'}`}><Users size={20} className="mr-3"/> Verification</button>
-        </nav>
-        <button onClick={onLogout} className="text-red-500 font-bold flex items-center p-3 hover:bg-red-900/10 rounded-xl"><LogOut size={20} className="mr-3"/> Sign Out</button>
-      </div>
-
-      {/* Main Content */}
-      <div className="flex-1 overflow-y-auto p-8 relative">
-          <header className="flex justify-between items-center mb-8"><h1 className="text-3xl font-black text-white capitalize">{activeTab}</h1><div className="flex items-center gap-4"><Bell className="text-neutral-400"/><div className="w-10 h-10 bg-gradient-to-tr from-blue-600 to-purple-600 rounded-full"></div></div></header>
-          
-          {activeTab === 'dashboard' && (
-              <div className="grid grid-cols-4 gap-6 animate-in fade-in">
-                  <div className="bg-[#111] p-6 rounded-2xl border border-neutral-800"><h3 className="text-gray-500 text-xs font-bold">Total Users</h3><p className="text-3xl font-black text-white">{stats.users}</p></div>
-                  <div className="bg-[#111] p-6 rounded-2xl border border-neutral-800"><h3 className="text-gray-500 text-xs font-bold">Pending</h3><p className="text-3xl font-black text-yellow-500">{pendingVerifications.length}</p></div>
-                  <div className="bg-[#111] p-6 rounded-2xl border border-neutral-800 col-span-2 flex justify-between items-center">
-                      <div><h3 className="text-gray-500 text-xs font-bold">Active OTP</h3><p className="text-4xl font-black text-green-500 tracking-widest font-mono">{generatedCode}</p></div>
-                      <button onClick={generateCode} className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-500"><RefreshCw size={18}/></button>
-                  </div>
-              </div>
-          )}
-
-          {activeTab === 'verification' && (
-            <div className="animate-in slide-in-from-right">
-                <div className="bg-[#111] rounded-3xl border border-neutral-800 overflow-hidden">
-                    <div className="p-6 border-b border-neutral-800"><h3 className="font-bold text-white">Verification Queue</h3></div>
-                    <table className="w-full text-left">
-                        <thead className="bg-[#0a0a0a] text-gray-500 text-xs uppercase font-bold"><tr><th className="p-4">Name</th><th className="p-4">Training</th><th className="p-4">Status</th><th className="p-4 text-right">Action</th></tr></thead>
-                        <tbody className="divide-y divide-neutral-800 text-sm text-gray-300">
-                            {pendingVerifications.map(v => (
-                                <tr key={v._id} className="hover:bg-white/5 transition cursor-pointer" onClick={() => setSelectedVol(v)}>
-                                    <td className="p-4 font-bold text-white flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-full bg-blue-900/50 flex items-center justify-center text-xs">{v.name.charAt(0)}</div>
-                                        <div>{v.name}<p className="text-gray-500 text-xs font-normal">{v.email}</p></div>
-                                    </td>
-                                    <td className="p-4">
-                                        {v.isGeriatricTrained ? <span className="flex items-center gap-1 text-green-400 text-xs font-bold"><Stethoscope size={12}/> Trained</span> : <span className="text-gray-600 text-xs">Standard</span>}
-                                    </td>
-                                    <td className="p-4"><span className="bg-yellow-500/10 text-yellow-500 px-2 py-1 rounded text-xs border border-yellow-500/20">Pending</span></td>
-                                    <td className="p-4 text-right"><button className="text-blue-400 hover:text-white font-bold text-xs border border-blue-500/30 px-3 py-1.5 rounded-lg flex items-center gap-1 ml-auto"><Eye size={12}/> View Details</button></td>
-                                </tr>
-                            ))}
-                            {pendingVerifications.length === 0 && <tr><td colSpan="4" className="p-8 text-center text-gray-600">No pending requests.</td></tr>}
-                        </tbody>
-                    </table>
-                </div>
+    <div className="min-h-screen bg-black text-white font-sans flex overflow-hidden">
+        
+        {/* SIDEBAR */}
+        <aside className={`${sidebarOpen ? 'w-72' : 'w-20'} bg-[#0a0a0a] border-r border-white/10 flex flex-col transition-all duration-300 z-20`}>
+            <div className="p-6 flex items-center justify-between">
+                {sidebarOpen && (
+                    <div className="flex items-center gap-2 text-green-500 animate-in fade-in">
+                        <Shield size={28} strokeWidth={2.5}/> 
+                        <span className="font-black text-xl tracking-tight text-white">Admin<span className="text-green-500">.</span></span>
+                    </div>
+                )}
+                <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2 hover:bg-white/10 rounded-lg text-gray-400">
+                    <Menu size={20}/>
+                </button>
             </div>
-          )}
-          
-          {/* Detail Modal */}
-          <VolunteerDetailModal />
-      </div>
+
+            <nav className="flex-1 px-4 space-y-2 mt-4">
+                <SidebarItem id="dashboard" icon={LayoutDashboard} label={sidebarOpen ? "Overview" : ""} />
+                <SidebarItem id="verification" icon={Check} label={sidebarOpen ? "Verification" : ""} count={volunteers.length} />
+                <SidebarItem id="users" icon={Users} label={sidebarOpen ? "All Users" : ""} />
+                <SidebarItem id="audit" icon={Activity} label={sidebarOpen ? "Audit Logs" : ""} />
+                <SidebarItem id="alerts" icon={AlertTriangle} label={sidebarOpen ? "SOS Alerts" : ""} count={stats.sosAlerts} />
+            </nav>
+
+            <div className="p-4 border-t border-white/10">
+                <button onClick={onLogout} className={`flex items-center gap-3 w-full p-3 rounded-xl text-red-500 hover:bg-red-900/10 transition ${!sidebarOpen && 'justify-center'}`}>
+                    <LogOut size={20}/>
+                    {sidebarOpen && <span className="font-bold text-sm">Logout</span>}
+                </button>
+            </div>
+        </aside>
+
+        {/* MAIN CONTENT */}
+        <main className="flex-1 h-screen overflow-y-auto bg-[#050505] p-8">
+            
+            {/* TOP HEADER */}
+            <header className="flex justify-between items-center mb-10">
+                <div>
+                    <h1 className="text-3xl font-black text-white">{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}</h1>
+                    <p className="text-gray-500 text-sm mt-1">Welcome back, Administrator.</p>
+                </div>
+                <div className="flex items-center gap-4">
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={18}/>
+                        <input type="text" placeholder="Search..." className="bg-[#1a1a1a] border border-white/10 rounded-full pl-10 pr-4 py-2.5 text-sm text-white focus:border-green-500 outline-none w-64 transition"/>
+                    </div>
+                    <button className="w-10 h-10 rounded-full bg-[#1a1a1a] border border-white/10 flex items-center justify-center text-gray-400 hover:text-white transition relative">
+                        <Bell size={18}/>
+                        <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full"></span>
+                    </button>
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-green-500 to-blue-500 border-2 border-[#050505]"></div>
+                </div>
+            </header>
+
+            {/* --- DASHBOARD VIEW --- */}
+            {activeTab === 'dashboard' && (
+                <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+                        <StatCard icon={Users} label="Total Users" value="1,240" color="text-blue-500" />
+                        <StatCard icon={Check} label="Active Volunteers" value="86" color="text-green-500" />
+                        <StatCard icon={Lock} label="Pending Review" value={volunteers.length} color="text-yellow-500" />
+                        <StatCard icon={AlertTriangle} label="SOS Triggers" value="3" color="text-red-500" />
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <div className="lg:col-span-2 bg-[#121212] rounded-[32px] border border-white/5 p-8">
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 className="text-xl font-bold">Live Activity</h3>
+                                <div className="flex gap-2">
+                                    <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                                    <span className="text-xs text-green-500 font-bold uppercase tracking-widest">Realtime</span>
+                                </div>
+                            </div>
+                            <div className="space-y-4">
+                                {[1,2,3,4].map(i => (
+                                    <div key={i} className="flex items-center justify-between p-4 bg-[#0a0a0a] rounded-2xl border border-white/5">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-10 h-10 rounded-full bg-[#1a1a1a] flex items-center justify-center text-blue-500"><MapPin size={18}/></div>
+                                            <div>
+                                                <p className="font-bold text-sm text-white">New Ride Request</p>
+                                                <p className="text-xs text-gray-500">Kottayam Central → Medical College</p>
+                                            </div>
+                                        </div>
+                                        <span className="text-xs text-gray-500 font-mono">2m ago</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="bg-gradient-to-br from-green-900/20 to-[#121212] rounded-[32px] border border-green-500/20 p-8 relative overflow-hidden">
+                            <div className="relative z-10">
+                                <h3 className="text-xl font-bold mb-2">Broadcast</h3>
+                                <p className="text-sm text-gray-400 mb-6">Send a push notification to all volunteers in a specific area.</p>
+                                <button className="w-full py-3 bg-white text-black font-bold rounded-xl hover:bg-gray-200 transition">Create Alert</button>
+                            </div>
+                            <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-green-500/10 rounded-full blur-[50px]"></div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* --- VERIFICATION VIEW --- */}
+            {activeTab === 'verification' && (
+                <div className="flex gap-8 h-[calc(100vh-140px)] animate-in fade-in">
+                    {/* List */}
+                    <div className="w-1/3 bg-[#121212] rounded-[24px] border border-white/5 overflow-hidden flex flex-col">
+                        <div className="p-6 border-b border-white/5">
+                            <h2 className="text-lg font-bold">Pending Queue</h2>
+                            <p className="text-xs text-gray-500">{volunteers.length} volunteers waiting</p>
+                        </div>
+                        <div className="overflow-y-auto flex-1 p-4 space-y-2">
+                            {volunteers.map(v => (
+                                <div 
+                                    key={v._id} 
+                                    onClick={() => setSelectedVol(v)}
+                                    className={`p-4 rounded-xl border cursor-pointer transition flex justify-between items-center ${selectedVol?._id === v._id ? 'bg-blue-600 text-white border-blue-500' : 'bg-[#1a1a1a] border-white/5 text-gray-400 hover:bg-[#222]'}`}
+                                >
+                                    <div>
+                                        <h4 className={`font-bold text-sm ${selectedVol?._id === v._id ? 'text-white' : 'text-gray-200'}`}>{v.name}</h4>
+                                        <p className={`text-[10px] ${selectedVol?._id === v._id ? 'text-blue-200' : 'text-gray-600'}`}>{v.email}</p>
+                                    </div>
+                                    <ChevronRight size={16} className={selectedVol?._id === v._id ? 'text-white' : 'text-gray-600'}/>
+                                </div>
+                            ))}
+                            {volunteers.length === 0 && <div className="p-8 text-center text-gray-600 text-sm">All caught up! 🎉</div>}
+                        </div>
+                    </div>
+
+                    {/* Details */}
+                    <div className="flex-1 bg-[#121212] rounded-[24px] border border-white/5 p-8 relative flex flex-col">
+                        {selectedVol ? (
+                            <>
+                                <div className="flex justify-between items-start mb-8">
+                                    <div>
+                                        <h1 className="text-3xl font-black">{selectedVol.name}</h1>
+                                        <div className="flex gap-2 mt-2">
+                                            <span className="bg-blue-500/10 text-blue-400 px-2 py-0.5 rounded text-[10px] font-bold uppercase">{selectedVol.serviceSector}</span>
+                                            <span className="bg-white/10 text-gray-400 px-2 py-0.5 rounded text-[10px] font-bold uppercase">ID: {selectedVol._id.slice(-4)}</span>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-xs text-gray-500 uppercase tracking-widest font-bold">Applied On</p>
+                                        <p className="font-mono text-sm text-white">{new Date(selectedVol.createdAt).toLocaleDateString()}</p>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-6 mb-8 flex-1 overflow-y-auto">
+                                    <div className="space-y-2">
+                                        <p className="text-xs font-bold text-blue-500 uppercase">Govt ID Proof</p>
+                                        <div className="w-full h-64 bg-black rounded-xl border border-white/10 flex items-center justify-center text-gray-600 relative overflow-hidden group">
+                                            <span className="text-xs z-10 font-mono">{selectedVol.govtId}</span>
+                                            <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                                                <button className="bg-white text-black px-4 py-2 rounded-lg text-xs font-bold">View Full</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <p className="text-xs font-bold text-green-500 uppercase">Live Selfie Capture</p>
+                                        <div className="w-full h-64 bg-black rounded-xl border border-white/10 flex items-center justify-center overflow-hidden">
+                                            {selectedVol.selfieImage ? (
+                                                <img src={selectedVol.selfieImage} className="w-full h-full object-cover" alt="Selfie"/>
+                                            ) : (
+                                                <span className="text-xs text-gray-600">No Image</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4 mt-auto">
+                                    <button onClick={() => handleDecision(selectedVol._id, 'rejected')} className="py-4 rounded-xl border border-red-900/50 text-red-500 font-bold hover:bg-red-900/10 transition flex items-center justify-center gap-2 uppercase text-sm tracking-widest"><X size={18}/> Reject Application</button>
+                                    <button onClick={() => handleDecision(selectedVol._id, 'approved')} className="py-4 rounded-xl bg-green-600 text-black font-bold hover:bg-green-500 transition flex items-center justify-center gap-2 uppercase text-sm tracking-widest shadow-lg shadow-green-900/20"><Check size={18}/> Approve Volunteer</button>
+                                </div>
+                            </>
+                        ) : (
+                            <div className="h-full flex flex-col items-center justify-center text-gray-600">
+                                <div className="w-16 h-16 bg-[#1a1a1a] rounded-full flex items-center justify-center mb-4"><Users size={24}/></div>
+                                <p>Select a volunteer to review details.</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* --- PLACEHOLDER FOR OTHER TABS --- */}
+            {['users', 'audit', 'alerts'].includes(activeTab) && (
+                <div className="h-96 flex flex-col items-center justify-center text-gray-600 bg-[#121212] rounded-[32px] border border-white/5">
+                    <Lock size={48} className="mb-4 opacity-50"/>
+                    <h3 className="text-xl font-bold text-white mb-1">Restricted Access</h3>
+                    <p className="text-sm">This module is currently locked or under development.</p>
+                </div>
+            )}
+
+        </main>
     </div>
   );
 };
+
+// Helper Icon for chevron (missing in import list sometimes)
+const ChevronRight = ({size, className}) => (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m9 18 6-6-6-6"/></svg>
+);
 
 export default AdminPanel;

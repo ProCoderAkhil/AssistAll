@@ -5,30 +5,33 @@ const UserSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
   phone: { type: String },
-  address: { type: String },
   role: { type: String, enum: ['user', 'volunteer', 'admin'], default: 'user' },
   
-  // --- VOLUNTEER SPECIFIC FIELDS ---
-  serviceSector: { 
-      type: String, 
-      enum: ['transport', 'medical', 'companionship', 'general'],
-      default: 'general' 
+  // --- USER SPECIFIC SAFETY & ACCESS ---
+  emergencyContact: {
+      name: { type: String },
+      phone: { type: String },
+      relation: { type: String }
   },
-  
+  medicalCondition: { type: String },
+  preferences: {
+      largeText: { type: Boolean, default: false },
+      wheelchair: { type: Boolean, default: false }
+  },
+
+  // --- VOLUNTEER SPECIFIC FIELDS ---
+  phoneVerified: { type: Boolean, default: false },
+  agreedToTerms: { type: Boolean, default: false },
+  selfieImage: { type: String },
+  serviceSector: { type: String, default: 'general' },
   govtId: { type: String }, 
   drivingLicense: { type: String }, 
-  medicalCertificate: { type: String }, 
-  
-  vehicleDetails: {
-      type: { type: String },
-      model: { type: String },
-      number: { type: String }
-  },
+  vehicleDetails: { type: Object },
 
   isVerified: { type: Boolean, default: false }, 
   verificationStatus: { 
     type: String, 
-    enum: ['pending', 'interview_scheduled', 'approved', 'rejected'], 
+    enum: ['pending', 'approved', 'rejected'], 
     default: 'pending' 
   },
   

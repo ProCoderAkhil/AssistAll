@@ -15,12 +15,13 @@ const RateAndTip = ({ requestData, onSkip, onSubmit, showToast }) => {
   const handleFinalSubmit = async (method) => {
       setLoading(true);
       try {
-        await fetch(`${DEPLOYED_API_URL}/api/requests/${requestData._id}/review`, {
+        // Send rating and review to backend
+        await fetch(`${DEPLOYED_API_URL}/api/requests/${requestData._id}/rate`, {
             method: 'PUT',
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ 
                 rating, 
-                feedback, 
+                review: feedback, 
                 tip: selectedTip, 
                 paymentMethod: selectedTip > 0 ? method : 'none' 
             })
@@ -31,7 +32,7 @@ const RateAndTip = ({ requestData, onSkip, onSubmit, showToast }) => {
       } catch (err) {
         console.error("Review Error:", err);
         if (showToast) showToast("Failed to submit review", "error");
-        onSubmit();
+        onSubmit(); // Still close even if error, to unblock user
       } finally {
         setLoading(false);
       }
@@ -48,7 +49,7 @@ const RateAndTip = ({ requestData, onSkip, onSubmit, showToast }) => {
   };
 
   const handleOnlinePayment = () => {
-      // Placeholder for Razorpay integration
+      // Placeholder for Payment Gateway integration
       alert(`Opening Payment Gateway for ₹${selectedTip}...`); 
       handleFinalSubmit('online');
   };
@@ -81,7 +82,7 @@ const RateAndTip = ({ requestData, onSkip, onSubmit, showToast }) => {
           ))}
       </div>
 
-      {/* Feedback Text Area (NEW) */}
+      {/* Feedback Text Area */}
       <div className="mb-6 relative">
           <MessageSquare className="absolute left-4 top-4 text-gray-400" size={18} />
           <textarea 

@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Loader2, X, Search, Users, Zap, Shield } from 'lucide-react';
+import { Loader2, X, Users, Shield } from 'lucide-react';
+
+const DEPLOYED_API_URL = window.location.hostname === 'localhost' 
+    ? 'http://localhost:5000' 
+    : 'https://assistall-server.onrender.com';
 
 const FindingVolunteer = ({ requestId, onCancel }) => {
   const [statusText, setStatusText] = useState("Scanning nearby sectors...");
@@ -31,11 +35,23 @@ const FindingVolunteer = ({ requestId, onCancel }) => {
     };
   }, []);
 
+  const handleCancelRequest = async () => {
+      try {
+          await fetch(`${DEPLOYED_API_URL}/api/requests/${requestId}/cancel`, {
+              method: 'PUT',
+              headers: { "Content-Type": "application/json" }
+          });
+          onCancel(); // Reset UI state in parent
+      } catch (e) {
+          alert("Could not cancel. Check internet.");
+      }
+  };
+
   return (
     <div className="absolute bottom-0 left-0 right-0 z-[2000] bg-[#121212] rounded-t-[40px] shadow-[0_-20px_60px_rgba(0,0,0,0.7)] p-8 pb-12 animate-in slide-in-from-bottom duration-500 border-t border-white/10 text-white font-sans">
       <div className="flex flex-col items-center justify-center text-center mt-2">
         
-        {/* --- V10 RADAR ANIMATION --- */}
+        {/* --- RADAR ANIMATION --- */}
         <div className="relative flex items-center justify-center mb-10 mt-4">
             {/* Outer Ripple */}
             <div className="absolute w-80 h-80 bg-green-500/5 rounded-full animate-[ping_3s_cubic-bezier(0,0,0.2,1)_infinite]"></div>
@@ -76,7 +92,7 @@ const FindingVolunteer = ({ requestId, onCancel }) => {
 
         {/* Cancel Button */}
         <button 
-            onClick={onCancel} 
+            onClick={handleCancelRequest} 
             className="w-16 h-16 bg-[#1a1a1a] rounded-full flex items-center justify-center hover:bg-red-900/20 hover:border-red-500/50 border border-white/10 transition-all duration-300 group shadow-lg active:scale-95"
         >
             <X size={24} className="text-gray-400 group-hover:text-red-500 transition-colors"/>
