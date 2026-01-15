@@ -5,24 +5,22 @@ import {
 } from 'lucide-react';
 
 const VolunteerSignup = ({ onRegister, onBack }) => {
+  // ✅ FIX 1: Force Live Server URL to stop infinite loading
+  const API_URL = 'https://assistall-server.onrender.com';
+
   const [step, setStep] = useState(1);
-  
-  // ✅ ADDED: gender field
   const [formData, setFormData] = useState({ 
       name: '', email: '', password: '', address: '', phone: '', gender: 'Male',
       serviceSector: 'transport', vehicleType: 'Car', vehicleModel: '', vehicleNumber: '' 
   });
   
-  // --- STATES ---
   const [govtIdFile, setGovtIdFile] = useState(null);
   const [licenseFile, setLicenseFile] = useState(null);
-  const [medicalFile, setMedicalFile] = useState(null); // ✅ ADDED: Medical Cert State
+  const [medicalFile, setMedicalFile] = useState(null); 
   const [selfie, setSelfie] = useState(null);
   
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [agreedToBackgroundCheck, setAgreedToBackgroundCheck] = useState(false);
-  
-  // Verification State
   const [registeredUserId, setRegisteredUserId] = useState(null);
   const [adminCodeInput, setAdminCodeInput] = useState(''); 
 
@@ -32,10 +30,8 @@ const VolunteerSignup = ({ onRegister, onBack }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:5000' : 'https://assistall-server.onrender.com';
   const GOOGLE_MEET_LINK = "https://meet.google.com/hva-psuy-qds"; 
 
-  // --- CAMERA LOGIC ---
   const startCamera = async () => {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true });
@@ -57,15 +53,12 @@ const VolunteerSignup = ({ onRegister, onBack }) => {
     }
   };
 
-  // --- STEP 3 SUBMIT: CREATE ACCOUNT ---
   const handleVerificationSubmit = async () => {
     setLoading(true); setError('');
     
-    // Validation
     if (!govtIdFile) { setError("Government ID is required."); setLoading(false); return; }
     if (!selfie) { setError("Live Selfie is required."); setLoading(false); return; }
     
-    // ✅ CONDITIONAL VALIDATION
     if (formData.serviceSector === 'transport' && !licenseFile) {
         setError("Driving License is required for Transport volunteers."); setLoading(false); return;
     }
@@ -76,11 +69,11 @@ const VolunteerSignup = ({ onRegister, onBack }) => {
     if (!agreedToTerms || !agreedToBackgroundCheck) { setError("Please agree to the terms."); setLoading(false); return; }
 
     try {
+      // Create payload (Sending file names for prototype)
       const payload = {
           ...formData,
           role: 'volunteer',
           govtId: govtIdFile.name,
-          // ✅ SEND CORRECT FILE NAMES
           drivingLicense: licenseFile ? licenseFile.name : '',
           medicalCertificate: medicalFile ? medicalFile.name : '',
           selfieImage: selfie, 
@@ -101,14 +94,13 @@ const VolunteerSignup = ({ onRegister, onBack }) => {
       const data = await res.json();
       if (res.ok) {
           setRegisteredUserId(data.user._id);
-          setStep(4); // Move to Interview Step
+          setStep(4);
       } else {
           setError(data.message || "Registration Failed.");
       }
-    } catch (e) { setError("Network Error"); } finally { setLoading(false); }
+    } catch (e) { setError("Network Error: Server might be starting up. Please wait 1 min."); } finally { setLoading(false); }
   };
 
-  // --- STEP 4 SUBMIT: VERIFY CODE ---
   const handleCodeSubmit = async () => {
       setLoading(true);
       try {
@@ -143,22 +135,21 @@ const VolunteerSignup = ({ onRegister, onBack }) => {
 
             {error && <div className="bg-red-900/20 text-red-500 p-3 rounded-xl text-center text-sm font-bold mb-6 border border-red-900/50 flex items-center justify-center gap-2"><AlertCircle size={16}/> {error}</div>}
 
-            {/* STEP 1: PERSONAL INFO */}
             {step === 1 && (
                 <div className="space-y-4 animate-in slide-in-from-right">
                     <input className="bg-[#111] border border-[#222] p-4 rounded-xl w-full focus:border-blue-600 outline-none" placeholder="Full Name" onChange={e => setFormData({...formData, name: e.target.value})} />
                     
-                    {/* ✅ GENDER SELECTION */}
+                    {/* ✅ FIX 2: Added 'bg-[#111]' to options to fix white-text-on-white-bg issue */}
                     <div className="bg-[#111] border border-[#222] p-4 rounded-xl w-full flex items-center gap-4">
                         <span className="text-gray-500 text-sm">Gender:</span>
                         <select 
-                            className="bg-transparent text-white outline-none flex-1"
+                            className="bg-transparent text-white outline-none flex-1 cursor-pointer"
                             value={formData.gender}
                             onChange={(e) => setFormData({...formData, gender: e.target.value})}
                         >
-                            <option value="Male">Male</option>
-                            <option value="Female">Female</option>
-                            <option value="Other">Other</option>
+                            <option value="Male" className="bg-[#111] text-white">Male</option>
+                            <option value="Female" className="bg-[#111] text-white">Female</option>
+                            <option value="Other" className="bg-[#111] text-white">Other</option>
                         </select>
                     </div>
 
@@ -169,11 +160,9 @@ const VolunteerSignup = ({ onRegister, onBack }) => {
                     <button onClick={() => setStep(2)} className="w-full bg-white text-black font-bold py-4 rounded-xl hover:bg-gray-200 transition mt-2">Next Step</button>
                 </div>
             )}
-
-            {/* STEP 2: DOCUMENTS & ROLE */}
+            
             {step === 2 && (
                 <div className="space-y-6 animate-in slide-in-from-right">
-                    {/* Role Selection */}
                     <div className="grid grid-cols-3 gap-3">
                         {['transport', 'medical', 'companionship'].map(sector => (
                             <button key={sector} onClick={() => setFormData({...formData, serviceSector: sector})} className={`p-4 rounded-2xl border flex flex-col items-center gap-2 transition ${formData.serviceSector === sector ? 'bg-blue-600 border-blue-400 text-white' : 'bg-[#111] border-[#222] text-gray-500'}`}>
@@ -182,16 +171,12 @@ const VolunteerSignup = ({ onRegister, onBack }) => {
                             </button>
                         ))}
                     </div>
-
                     <div className="bg-[#111] p-5 rounded-2xl border border-[#222] space-y-4">
-                        {/* Govt ID (Always Required) */}
                         <div onClick={() => document.getElementById('govtId').click()} className="flex justify-between p-4 bg-[#0a0a0a] rounded-xl border border-[#222] cursor-pointer hover:border-blue-500">
                             <span className="text-sm flex items-center gap-2"><Shield size={16} className="text-blue-500"/> Government ID</span>
                             <span className="text-xs text-blue-400 font-bold">{govtIdFile ? "Uploaded" : "Upload"}</span>
                             <input id="govtId" type="file" hidden onChange={e => setGovtIdFile(e.target.files[0])}/>
                         </div>
-
-                        {/* ✅ CONDITIONAL: Driving License */}
                         {formData.serviceSector === 'transport' && (
                             <div onClick={() => document.getElementById('license').click()} className="flex justify-between p-4 bg-[#0a0a0a] rounded-xl border border-[#222] cursor-pointer hover:border-orange-500">
                                 <span className="text-sm flex items-center gap-2"><Car size={16} className="text-orange-500"/> Driving License</span>
@@ -199,8 +184,6 @@ const VolunteerSignup = ({ onRegister, onBack }) => {
                                 <input id="license" type="file" hidden onChange={e => setLicenseFile(e.target.files[0])}/>
                             </div>
                         )}
-
-                        {/* ✅ CONDITIONAL: Medical Certificate */}
                         {formData.serviceSector === 'medical' && (
                             <div onClick={() => document.getElementById('medicalCert').click()} className="flex justify-between p-4 bg-[#0a0a0a] rounded-xl border border-[#222] cursor-pointer hover:border-green-500">
                                 <span className="text-sm flex items-center gap-2"><Stethoscope size={16} className="text-green-500"/> Nursing Cert</span>
@@ -209,15 +192,10 @@ const VolunteerSignup = ({ onRegister, onBack }) => {
                             </div>
                         )}
                     </div>
-
-                    <div className="flex gap-3">
-                        <button onClick={() => setStep(1)} className="px-6 py-4 rounded-xl font-bold bg-[#111] text-gray-400">Back</button>
-                        <button onClick={() => setStep(3)} className="flex-1 bg-white text-black font-bold py-4 rounded-xl hover:bg-gray-200">Next Step</button>
-                    </div>
+                    <div className="flex gap-3"><button onClick={() => setStep(1)} className="px-6 py-4 rounded-xl font-bold bg-[#111] text-gray-400">Back</button><button onClick={() => setStep(3)} className="flex-1 bg-white text-black font-bold py-4 rounded-xl hover:bg-gray-200">Next Step</button></div>
                 </div>
             )}
 
-            {/* STEP 3: LIVENESS (Same as before) */}
             {step === 3 && (
                 <div className="space-y-6 animate-in slide-in-from-right text-center">
                     <div className="bg-[#111] rounded-2xl overflow-hidden border border-[#333] relative h-56 flex items-center justify-center">
@@ -225,50 +203,28 @@ const VolunteerSignup = ({ onRegister, onBack }) => {
                         <canvas ref={canvasRef} className="hidden"></canvas>
                     </div>
                     {!selfie ? (cameraActive ? <button onClick={capturePhoto} className="w-full bg-white text-black font-bold py-3 rounded-xl">Capture</button> : <button onClick={startCamera} className="w-full bg-blue-600 text-white font-bold py-3 rounded-xl">Start Camera</button>) : <button onClick={() => { setSelfie(null); startCamera(); }} className="w-full bg-[#222] text-white font-bold py-3 rounded-xl">Retake</button>}
-                    
                     <div className="text-left space-y-2 px-2">
                         <label className="flex gap-3 items-center cursor-pointer"><input type="checkbox" className="accent-blue-600" checked={agreedToTerms} onChange={e => setAgreedToTerms(e.target.checked)}/><span className="text-xs text-gray-400">Code of Conduct</span></label>
                         <label className="flex gap-3 items-center cursor-pointer"><input type="checkbox" className="accent-blue-600" checked={agreedToBackgroundCheck} onChange={e => setAgreedToBackgroundCheck(e.target.checked)}/><span className="text-xs text-gray-400">Background Check</span></label>
                     </div>
-
-                    <div className="flex gap-3">
-                        <button onClick={() => setStep(2)} className="px-6 py-4 rounded-xl font-bold bg-[#111] text-gray-400">Back</button>
-                        <button onClick={handleVerificationSubmit} disabled={loading} className="flex-1 bg-green-600 text-black font-bold py-4 rounded-xl disabled:opacity-50">
-                            {loading ? <Loader2 className="animate-spin mx-auto"/> : "Proceed to Interview"}
-                        </button>
-                    </div>
+                    <div className="flex gap-3"><button onClick={() => setStep(2)} className="px-6 py-4 rounded-xl font-bold bg-[#111] text-gray-400">Back</button><button onClick={handleVerificationSubmit} disabled={loading} className="flex-1 bg-green-600 text-black font-bold py-4 rounded-xl disabled:opacity-50">{loading ? <Loader2 className="animate-spin mx-auto"/> : "Proceed to Interview"}</button></div>
                 </div>
             )}
 
-            {/* STEP 4: LIVE GOOGLE MEET & CODE (Same as before) */}
             {step === 4 && (
                 <div className="space-y-6 animate-in slide-in-from-right text-center">
                     <div className="bg-blue-900/10 p-6 rounded-3xl border border-blue-500/30 flex flex-col items-center">
-                        <div className="w-20 h-20 bg-blue-500/20 rounded-full flex items-center justify-center mb-4 text-blue-400 animate-pulse border-4 border-black">
-                            <Video size={36}/>
-                        </div>
+                        <div className="w-20 h-20 bg-blue-500/20 rounded-full flex items-center justify-center mb-4 text-blue-400 animate-pulse border-4 border-black"><Video size={36}/></div>
                         <h3 className="text-xl font-black text-white mb-2">Live Interview</h3>
-                        <p className="text-sm text-gray-400 mb-6 max-w-xs">
-                            1. Join Meet. 2. Show ID. 3. Enter Code.
-                        </p>
-                        
-                        <a href={GOOGLE_MEET_LINK} target="_blank" rel="noreferrer" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 mb-6 transition">
-                            <ExternalLink size={18}/> Join Google Meet
-                        </a>
-
+                        <p className="text-sm text-gray-400 mb-6 max-w-xs">1. Join Meet. 2. Show ID. 3. Enter Code.</p>
+                        <a href={GOOGLE_MEET_LINK} target="_blank" rel="noreferrer" className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 mb-6 transition"><ExternalLink size={18}/> Join Google Meet</a>
                         <div className="w-full bg-black/50 p-4 rounded-xl border border-white/10">
                             <label className="text-[10px] text-gray-500 font-bold uppercase tracking-widest block mb-2 text-left">Verification Code</label>
                             <input type="text" placeholder="ENTER CODE" className="bg-transparent text-white text-center text-2xl font-mono tracking-[0.2em] outline-none w-full uppercase" value={adminCodeInput} onChange={(e) => setAdminCodeInput(e.target.value)}/>
                         </div>
                     </div>
-
-                    <button onClick={handleCodeSubmit} disabled={loading} className="w-full bg-green-600 text-black font-black py-4 rounded-xl hover:bg-green-500 transition">
-                        {loading ? <Loader2 className="animate-spin mx-auto"/> : "Verify & Submit"}
-                    </button>
-                    
-                    <p className="text-[10px] text-red-400 font-bold uppercase mt-4 flex items-center justify-center gap-1">
-                        <Lock size={10}/> Locked until Admin Approval
-                    </p>
+                    <button onClick={handleCodeSubmit} disabled={loading} className="w-full bg-green-600 text-black font-black py-4 rounded-xl hover:bg-green-500 transition">{loading ? <Loader2 className="animate-spin mx-auto"/> : "Verify & Submit"}</button>
+                    <p className="text-[10px] text-red-400 font-bold uppercase mt-4 flex items-center justify-center gap-1"><Lock size={10}/> Locked until Admin Approval</p>
                 </div>
             )}
         </div>

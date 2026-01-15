@@ -1,22 +1,22 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
     Menu, Bell, CheckCircle, Navigation, Star, Phone, Shield, Share2, 
-    MessageSquare, Loader2, X, Stethoscope, MapPin, 
-    CreditCard, Banknote, ShieldCheck, AlertTriangle 
+    MessageSquare, ChevronUp, Loader2, X, Stethoscope, FileText, MapPin, 
+    Banknote, ShieldCheck, AlertTriangle 
 } from 'lucide-react';
 import ServiceSelector from './ServiceSelector';
 
-const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:5000' : 'https://assistall-server.onrender.com';
+// ✅ FIX 3: Force Live Server URL
+const API_BASE = 'https://assistall-server.onrender.com';
 
 // ==========================================
-// 1. RATE & TIP COMPONENT
+// 1. RATE & TIP COMPONENT (Cash Only)
 // ==========================================
 const RateAndTip = ({ requestData, onSkip, onSubmit }) => {
     const [rating, setRating] = useState(5);
     const [feedback, setFeedback] = useState('');
     const [selectedTip, setSelectedTip] = useState(0);
     const [loading, setLoading] = useState(false);
-    const [paymentMode, setPaymentMode] = useState('online');
 
     const handleFinalSubmit = async (method) => {
         setLoading(true);
@@ -28,17 +28,19 @@ const RateAndTip = ({ requestData, onSkip, onSubmit }) => {
             });
             alert("Thank you! Feedback Submitted.");
             onSubmit(); 
-        } catch (err) { onSubmit(); } 
-        finally { setLoading(false); }
+        } catch (err) { 
+            console.error(err);
+            onSubmit(); 
+        } finally { 
+            setLoading(false); 
+        }
     };
 
     const handleCashPayment = () => {
         setLoading(true);
         alert(`Please give ₹${selectedTip} cash to the volunteer.`);
-        setTimeout(() => { handleFinalSubmit('cash'); }, 2000);
+        setTimeout(() => { handleFinalSubmit('cash'); }, 1500);
     };
-
-    const handleOnlinePayment = () => { handleFinalSubmit('online'); };
 
     return (
         <div className="fixed inset-0 z-[6000] bg-white flex flex-col items-center justify-center p-6 animate-in zoom-in font-sans">
@@ -61,30 +63,27 @@ const RateAndTip = ({ requestData, onSkip, onSubmit }) => {
                 <textarea className="w-full bg-gray-50 border border-gray-200 rounded-2xl p-4 pl-12 text-sm focus:outline-none focus:border-green-500 resize-none text-gray-700" rows="2" placeholder="Write a review..." value={feedback} onChange={(e) => setFeedback(e.target.value)}/>
             </div>
 
-            <p className="font-bold text-gray-700 mb-3 text-center text-xs uppercase tracking-wide">Add a Tip</p>
+            <p className="font-bold text-gray-700 mb-3 text-center text-xs uppercase tracking-wide">Add a Tip (Cash Only)</p>
             <div className="grid grid-cols-4 gap-3 mb-6 w-full max-w-sm">
                 {[0, 20, 50, 100].map(amt => (
                     <button key={amt} onClick={() => setSelectedTip(amt)} className={`py-3 rounded-xl font-bold border transition ${selectedTip === amt ? 'bg-black text-white' : 'bg-gray-50 text-gray-700'}`}>{amt === 0 ? "No" : `₹${amt}`}</button>
                 ))}
             </div>
             
-            {selectedTip > 0 && (
-                <div className="bg-blue-50 p-4 rounded-xl mb-6 w-full max-w-sm border border-blue-100 animate-in fade-in">
-                    <p className="text-xs font-bold text-blue-600 uppercase mb-3 flex items-center"><ShieldCheck size={14} className="mr-1"/> Payment Method</p>
-                    <div className="flex gap-3">
-                        <button onClick={() => setPaymentMode('online')} className={`flex-1 p-3 rounded-xl border-2 flex flex-col items-center justify-center transition ${paymentMode === 'online' ? 'border-blue-600 bg-white text-blue-700' : 'border-transparent bg-blue-100/50 text-gray-500'}`}><CreditCard size={24} className="mb-1"/><span className="text-xs font-bold">Online</span></button>
-                        <button onClick={() => setPaymentMode('cash')} className={`flex-1 p-3 rounded-xl border-2 flex flex-col items-center justify-center transition ${paymentMode === 'cash' ? 'border-green-600 bg-white text-green-700' : 'border-transparent bg-green-100/50 text-gray-500'}`}><Banknote size={24} className="mb-1"/><span className="text-xs font-bold">Cash</span></button>
-                    </div>
-                </div>
+            {/* Payment Button */}
+            {selectedTip > 0 ? (
+                <button 
+                    onClick={handleCashPayment} 
+                    disabled={loading} 
+                    className="w-full max-w-sm text-white font-bold py-4 rounded-2xl mb-3 transition flex items-center justify-center shadow-lg active:scale-95 bg-green-600 hover:bg-green-700"
+                >
+                    {loading ? <Loader2 className="animate-spin mr-2"/> : `Confirm Cash Payment (₹${selectedTip})`}
+                </button>
+            ) : (
+                <button onClick={() => handleFinalSubmit('none')} disabled={loading} className="w-full max-w-sm bg-black text-white font-bold py-4 rounded-2xl mb-3 hover:bg-gray-800 shadow-lg active:scale-95 flex items-center justify-center">
+                    {loading ? <Loader2 className="animate-spin"/> : "Submit Review"}
+                </button>
             )}
-            
-            <button 
-                onClick={() => handleFinalSubmit(selectedTip > 0 ? paymentMode : 'none')} 
-                disabled={loading} 
-                className={`w-full max-w-sm text-white font-bold py-4 rounded-2xl mb-3 transition flex items-center justify-center shadow-lg active:scale-95 ${paymentMode === 'online' && selectedTip > 0 ? 'bg-[#3395ff]' : selectedTip > 0 ? 'bg-green-600' : 'bg-black'}`}
-            >
-                {loading ? <Loader2 className="animate-spin"/> : selectedTip > 0 ? (paymentMode === 'online' ? `Pay ₹${selectedTip}` : `Confirm Cash Payment`) : "Submit Review"}
-            </button>
             
             <button onClick={onSkip} className="text-gray-400 font-bold text-sm">Skip Feedback</button>
         </div>
@@ -208,7 +207,7 @@ const RideInProgress = ({ requestData }) => {
 };
 
 // ==========================================
-// 3. MAIN CONTROLLER (FIXED)
+// 3. MAIN CONTROLLER
 // ==========================================
 
 const UserDashboard = () => {
@@ -261,7 +260,6 @@ const UserDashboard = () => {
 
         const pollInterval = setInterval(async () => {
             try {
-                // Polling ALL requests (including completed ones thanks to backend fix)
                 const res = await fetch(`${API_BASE}/api/requests?t=${Date.now()}`);
                 if (res.ok) {
                     const data = await res.json();
@@ -317,7 +315,7 @@ const UserDashboard = () => {
     return (
         <div className="h-screen bg-neutral-100 text-black font-sans flex flex-col relative overflow-hidden">
             
-            {/* Map (Hidden ONLY if Completed) */}
+            {/* Map (Hidden if Completed to force focus on Rating) */}
             {viewState !== 'completed' && (
                 <div className="absolute inset-0 z-0">
                     <iframe width="100%" height="100%" frameBorder="0" scrolling="no" src="https://www.openstreetmap.org/export/embed.html?bbox=76.51%2C9.58%2C76.54%2C9.60&amp;layer=mapnik&amp;marker=9.59%2C76.52" style={{ filter: 'grayscale(100%) invert(90%) contrast(120%)' }}></iframe>
