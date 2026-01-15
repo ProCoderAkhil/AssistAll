@@ -9,15 +9,101 @@ import ServiceSelector from './ServiceSelector';
 const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:5000' : 'https://assistall-server.onrender.com';
 
 // ==========================================
-// 1. HELPER COMPONENTS
+// 1. RATE & TIP COMPONENT (Payment & Review)
+// ==========================================
+const RateAndTip = ({ requestData, onSkip, onSubmit }) => {
+    const [rating, setRating] = useState(5);
+    const [feedback, setFeedback] = useState('');
+    const [selectedTip, setSelectedTip] = useState(0);
+    const [loading, setLoading] = useState(false);
+    const [paymentMode, setPaymentMode] = useState('online');
+
+    const handleFinalSubmit = async (method) => {
+        setLoading(true);
+        try {
+            await fetch(`${API_BASE}/api/requests/${requestData._id}/review`, {
+                method: 'PUT',
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ rating, review: feedback, tip: selectedTip, paymentMethod: method })
+            });
+            alert("Thank you! Feedback Submitted.");
+            onSubmit(); 
+        } catch (err) { 
+            console.error(err);
+            onSubmit(); 
+        } finally { 
+            setLoading(false); 
+        }
+    };
+
+    const handleCashPayment = () => {
+        setLoading(true);
+        alert(`Please give ₹${selectedTip} cash to the volunteer.`);
+        setTimeout(() => { handleFinalSubmit('cash'); }, 2000);
+    };
+
+    const handleOnlinePayment = () => { handleFinalSubmit('online'); };
+
+    return (
+        <div className="fixed inset-0 z-[6000] bg-white flex flex-col items-center justify-center p-6 animate-in zoom-in font-sans">
+            <div className="text-center mb-6">
+                <div className="mx-auto bg-green-100 w-20 h-20 rounded-full flex items-center justify-center mb-4 border-4 border-green-50 animate-bounce">
+                    <CheckCircle size={40} className="text-green-600" />
+                </div>
+                <h2 className="text-3xl font-black text-gray-900">Ride Completed!</h2>
+                <p className="text-gray-500 mt-2 font-medium">How was {requestData?.volunteerName}?</p>
+            </div>
+            
+            <div className="flex justify-center gap-3 mb-6">
+                {[1, 2, 3, 4, 5].map(star => (
+                    <Star key={star} size={40} className={`cursor-pointer transition hover:scale-110 ${star <= rating ? 'text-yellow-400 fill-current' : 'text-gray-200'}`} onClick={() => setRating(star)}/>
+                ))}
+            </div>
+            
+            <div className="w-full max-w-sm mb-6 relative">
+                <MessageSquare className="absolute left-4 top-4 text-gray-400" size={18} />
+                <textarea className="w-full bg-gray-50 border border-gray-200 rounded-2xl p-4 pl-12 text-sm focus:outline-none focus:border-green-500 resize-none text-gray-700" rows="2" placeholder="Write a review..." value={feedback} onChange={(e) => setFeedback(e.target.value)}/>
+            </div>
+
+            <p className="font-bold text-gray-700 mb-3 text-center text-xs uppercase tracking-wide">Add a Tip</p>
+            <div className="grid grid-cols-4 gap-3 mb-6 w-full max-w-sm">
+                {[0, 20, 50, 100].map(amt => (
+                    <button key={amt} onClick={() => setSelectedTip(amt)} className={`py-3 rounded-xl font-bold border transition ${selectedTip === amt ? 'bg-black text-white' : 'bg-gray-50 text-gray-700'}`}>{amt === 0 ? "No" : `₹${amt}`}</button>
+                ))}
+            </div>
+            
+            {selectedTip > 0 && (
+                <div className="bg-blue-50 p-4 rounded-xl mb-6 w-full max-w-sm border border-blue-100 animate-in fade-in">
+                    <p className="text-xs font-bold text-blue-600 uppercase mb-3 flex items-center"><ShieldCheck size={14} className="mr-1"/> Payment Method</p>
+                    <div className="flex gap-3">
+                        <button onClick={() => setPaymentMode('online')} className={`flex-1 p-3 rounded-xl border-2 flex flex-col items-center justify-center transition ${paymentMode === 'online' ? 'border-blue-600 bg-white text-blue-700' : 'border-transparent bg-blue-100/50 text-gray-500'}`}><CreditCard size={24} className="mb-1"/><span className="text-xs font-bold">Online</span></button>
+                        <button onClick={() => setPaymentMode('cash')} className={`flex-1 p-3 rounded-xl border-2 flex flex-col items-center justify-center transition ${paymentMode === 'cash' ? 'border-green-600 bg-white text-green-700' : 'border-transparent bg-green-100/50 text-gray-500'}`}><Banknote size={24} className="mb-1"/><span className="text-xs font-bold">Cash</span></button>
+                    </div>
+                </div>
+            )}
+            
+            <button 
+                onClick={() => handleFinalSubmit(selectedTip > 0 ? paymentMode : 'none')} 
+                disabled={loading} 
+                className={`w-full max-w-sm text-white font-bold py-4 rounded-2xl mb-3 transition flex items-center justify-center shadow-lg active:scale-95 ${paymentMode === 'online' && selectedTip > 0 ? 'bg-[#3395ff]' : selectedTip > 0 ? 'bg-green-600' : 'bg-black'}`}
+            >
+                {loading ? <Loader2 className="animate-spin"/> : selectedTip > 0 ? (paymentMode === 'online' ? `Pay ₹${selectedTip}` : `Confirm Cash Payment`) : "Submit Review"}
+            </button>
+            
+            <button onClick={onSkip} className="text-gray-400 font-bold text-sm">Skip Feedback</button>
+        </div>
+    );
+};
+
+// ==========================================
+// 2. HELPER COMPONENTS
 // ==========================================
 
 const StatusBanner = ({ status }) => {
-    if (!status || status === 'pending') return null;
+    if (!status || status === 'pending' || status === 'completed') return null;
     let bg = "bg-blue-600", text = "Updating...", icon = <Bell size={16} />;
     if (status === 'accepted') { bg = "bg-green-600"; text = "VOLUNTEER FOUND"; icon = <CheckCircle size={16} />; }
     else if (status === 'in_progress') { bg = "bg-blue-600"; text = "RIDE IN PROGRESS"; icon = <Navigation size={16} />; }
-    else if (status === 'completed') { bg = "bg-black"; text = "RIDE COMPLETED"; icon = <Star size={16} />; }
     
     return (
         <div className={`fixed top-0 left-0 right-0 ${bg} text-white px-4 py-3 z-[5000] shadow-xl animate-in slide-in-from-top flex items-center justify-center gap-3`}>
@@ -125,86 +211,8 @@ const RideInProgress = ({ requestData }) => {
     );
 };
 
-const RateAndTip = ({ requestData, onSkip, onSubmit, showToast }) => {
-    const [rating, setRating] = useState(5);
-    const [feedback, setFeedback] = useState('');
-    const [selectedTip, setSelectedTip] = useState(0);
-    const [loading, setLoading] = useState(false);
-    const [paymentMode, setPaymentMode] = useState('online');
-
-    const handleFinalSubmit = async (method) => {
-        setLoading(true);
-        try {
-            await fetch(`${API_BASE}/api/requests/${requestData._id}/review`, {
-                method: 'PUT',
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ rating, review: feedback, tip: selectedTip, paymentMethod: method })
-            });
-            alert("Thank you! Feedback Submitted.");
-            onSubmit(); 
-        } catch (err) { onSubmit(); } 
-        finally { setLoading(false); }
-    };
-
-    const handleCashPayment = () => {
-        setLoading(true);
-        alert(`Please give ₹${selectedTip} cash to the volunteer.`);
-        setTimeout(() => { handleFinalSubmit('cash'); }, 2000);
-    };
-
-    const handleOnlinePayment = () => { handleFinalSubmit('online'); };
-
-    const submitReviewOnly = () => { handleFinalSubmit('none'); };
-
-    return (
-        <div className="fixed inset-0 z-[6000] bg-white flex flex-col items-center justify-center p-6 animate-in zoom-in font-sans">
-            <div className="text-center mb-6">
-                <div className="mx-auto bg-green-100 w-20 h-20 rounded-full flex items-center justify-center mb-4"><CheckCircle size={40} className="text-green-600" /></div>
-                <h2 className="text-3xl font-black text-gray-900">Ride Completed!</h2>
-                <p className="text-gray-500 mt-2 font-medium">How was {requestData?.volunteerName}?</p>
-            </div>
-            
-            <div className="flex justify-center gap-3 mb-6">
-                {[1, 2, 3, 4, 5].map(star => (
-                    <Star key={star} size={40} className={`cursor-pointer transition hover:scale-110 ${star <= rating ? 'text-yellow-400 fill-current' : 'text-gray-200'}`} onClick={() => setRating(star)}/>
-                ))}
-            </div>
-            
-            <div className="w-full max-w-sm mb-6 relative">
-                <MessageSquare className="absolute left-4 top-4 text-gray-400" size={18} />
-                <textarea className="w-full bg-gray-50 border border-gray-200 rounded-2xl p-4 pl-12 text-sm focus:outline-none focus:border-green-500 resize-none text-gray-700" rows="2" placeholder="Write a review..." value={feedback} onChange={(e) => setFeedback(e.target.value)}/>
-            </div>
-
-            <p className="font-bold text-gray-700 mb-3 text-center text-xs uppercase tracking-wide">Add a Tip</p>
-            <div className="grid grid-cols-4 gap-3 mb-6 w-full max-w-sm">
-                {[0, 20, 50, 100].map(amt => (
-                    <button key={amt} onClick={() => setSelectedTip(amt)} className={`py-3 rounded-xl font-bold border transition ${selectedTip === amt ? 'bg-black text-white' : 'bg-gray-50 text-gray-700'}`}>{amt === 0 ? "No" : `₹${amt}`}</button>
-                ))}
-            </div>
-            
-            {selectedTip > 0 && (
-                <div className="bg-blue-50 p-4 rounded-xl mb-6 w-full max-w-sm border border-blue-100">
-                    <p className="text-xs font-bold text-blue-600 uppercase mb-3 flex items-center"><ShieldCheck size={14} className="mr-1"/> Payment Method</p>
-                    <div className="flex gap-3">
-                        <button onClick={() => setPaymentMode('online')} className={`flex-1 p-3 rounded-xl border-2 flex flex-col items-center justify-center transition ${paymentMode === 'online' ? 'border-blue-600 bg-white text-blue-700' : 'border-transparent bg-blue-100/50 text-gray-500'}`}><CreditCard size={24} className="mb-1"/><span className="text-xs font-bold">Online</span></button>
-                        <button onClick={() => setPaymentMode('cash')} className={`flex-1 p-3 rounded-xl border-2 flex flex-col items-center justify-center transition ${paymentMode === 'cash' ? 'border-green-600 bg-white text-green-700' : 'border-transparent bg-green-100/50 text-gray-500'}`}><Banknote size={24} className="mb-1"/><span className="text-xs font-bold">Cash</span></button>
-                    </div>
-                </div>
-            )}
-            
-            {selectedTip > 0 ? (
-                <button onClick={paymentMode === 'online' ? handleOnlinePayment : handleCashPayment} disabled={loading} className={`w-full max-w-sm text-white font-bold py-4 rounded-2xl mb-3 transition flex items-center justify-center shadow-lg active:scale-95 ${paymentMode === 'online' ? 'bg-[#3395ff]' : 'bg-green-600'}`}>{loading ? <Loader2 className="animate-spin"/> : paymentMode === 'online' ? `Pay ₹${selectedTip}` : `Confirm Cash Payment`}</button>
-            ) : (
-                <button onClick={submitReviewOnly} disabled={loading} className="w-full max-w-sm bg-black text-white font-bold py-4 rounded-2xl mb-3 hover:bg-gray-800 shadow-lg active:scale-95 flex items-center justify-center">{loading ? <Loader2 className="animate-spin"/> : "Submit Review"}</button>
-            )}
-            
-            <button onClick={onSkip} className="text-gray-400 font-bold text-sm">Skip Feedback</button>
-        </div>
-    );
-};
-
 // ==========================================
-// 2. MAIN CONTROLLER (FIXED)
+// 3. MAIN CONTROLLER (FIXED)
 // ==========================================
 
 const UserDashboard = () => {
@@ -213,7 +221,7 @@ const UserDashboard = () => {
     const [volunteerDetails, setVolunteerDetails] = useState(null);
     const [showProfile, setShowProfile] = useState(false);
     
-    // Tracks the current ride ID we are polling for
+    // Tracks current ride ID. Initialize from localStorage.
     const [rideIdToPoll, setRideIdToPoll] = useState(() => localStorage.getItem('activeRideId'));
 
     // --- FETCH PROFILE ---
@@ -244,7 +252,7 @@ const UserDashboard = () => {
             if (res.ok) {
                 const data = await res.json();
                 localStorage.setItem('activeRideId', data._id);
-                setRideIdToPoll(data._id); // Start Polling
+                setRideIdToPoll(data._id); // Triggers polling
                 setViewState('searching');
             }
         } catch (e) { alert("Connection Error"); }
@@ -252,11 +260,11 @@ const UserDashboard = () => {
 
     // --- ROBUST POLLING EFFECT ---
     useEffect(() => {
+        // If no ID to poll, stop here
         if (!rideIdToPoll) return;
 
         const pollInterval = setInterval(async () => {
             try {
-                // Fetch ALL data to find our ride
                 const res = await fetch(`${API_BASE}/api/requests?t=${Date.now()}`);
                 if (res.ok) {
                     const data = await res.json();
@@ -270,9 +278,10 @@ const UserDashboard = () => {
                         // 1. COMPLETED: High Priority Check
                         if (myRide.status === 'completed') {
                             setViewState('completed');
-                            localStorage.removeItem('activeRideId');
-                            setRideIdToPoll(null); // STOP POLLING immediately
-                            return;
+                            // We do NOT clear rideIdToPoll yet so activeRide stays populated for RateAndTip
+                            // But we stop polling to save resources and prevent flicker
+                            clearInterval(pollInterval); 
+                            return; 
                         }
 
                         // 2. ACCEPTED
@@ -303,13 +312,15 @@ const UserDashboard = () => {
         setRideIdToPoll(null);
         setActiveRide(null);
         setViewState('menu');
+        // Optional: Refresh page to ensure clean slate
+        // window.location.reload(); 
     };
 
     // --- RENDER ---
     return (
         <div className="h-screen bg-neutral-100 text-black font-sans flex flex-col relative overflow-hidden">
             
-            {/* Map (Hidden ONLY if Completed) */}
+            {/* Map (Hidden if Completed to force focus on Rating) */}
             {viewState !== 'completed' && (
                 <div className="absolute inset-0 z-0">
                     <iframe width="100%" height="100%" frameBorder="0" scrolling="no" src="https://www.openstreetmap.org/export/embed.html?bbox=76.51%2C9.58%2C76.54%2C9.60&amp;layer=mapnik&amp;marker=9.59%2C76.52" style={{ filter: 'grayscale(100%) invert(90%) contrast(120%)' }}></iframe>
@@ -326,6 +337,7 @@ const UserDashboard = () => {
                 </div>
             )}
 
+            {/* Status Banner */}
             {activeRide && viewState !== 'completed' && <StatusBanner status={activeRide.status} />}
 
             {/* --- VIEW SWITCHER --- */}
