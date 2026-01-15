@@ -19,7 +19,7 @@ mongoose.connect(process.env.MONGO_URI)
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/requests', require('./routes/requests'));
 
-// ❌ PAYMENT ROUTE REMOVED
+// ❌ PAYMENT ROUTE REMOVED (Prevents Crash)
 // app.use('/api/payment', require('./routes/payment')); 
 
 const PORT = process.env.PORT || 5000;
