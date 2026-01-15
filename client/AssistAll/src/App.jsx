@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom'; // Added Navigate
+import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom'; 
 import { Menu, Bell, Shield, AlertTriangle } from 'lucide-react';
 
 // Components
@@ -22,7 +22,7 @@ import LandingPage from './components/LandingPage';
 import AppLoader from './components/AppLoader'; 
 import SOSModal from './components/SOSModal'; 
 
-// ✅ FIX 1: Hardcoded Live URL to prevent local dev issues
+// ✅ Hardcoded Live URL
 const DEPLOYED_API_URL = 'https://assistall-server.onrender.com';
 
 // --- ERROR BOUNDARY ---
@@ -62,7 +62,7 @@ function App() {
   // Fake loader for "App Initialization"
   useEffect(() => { setTimeout(() => setIsLoading(false), 2000); }, []);
 
-  // ✅ FIX 2: Polling logic for Active Rides
+  // Polling logic for Active Rides
   useEffect(() => {
     if (!activeRequestId || !user) return;
     const interval = setInterval(async () => {
@@ -86,7 +86,7 @@ function App() {
     return () => clearInterval(interval);
   }, [activeRequestId, step, user]);
 
-  // ✅ FIX 3: Centralized Login Handler
+  // Centralized Login Handler
   const handleLoginSuccess = (userData, token) => {
       localStorage.setItem('user', JSON.stringify(userData));
       if(token) localStorage.setItem('token', token);
@@ -133,6 +133,15 @@ function App() {
       return '/home';
   };
 
+  // Handler for Landing Page buttons
+  const handleGetStarted = () => {
+      if (user) {
+          navigate(getDashboardPath(user.role));
+      } else {
+          navigate('/login');
+      }
+  };
+
   return (
     <ErrorBoundary>
       {isLoading ? <AppLoader /> : (
@@ -142,13 +151,15 @@ function App() {
           </div>
 
           <Routes>
-            {/* ✅ ROOT ROUTE: If User exists -> Dashboard, Else -> Landing Page */}
+            {/* ✅ FIXED: Always show Landing Page at root */}
             <Route path="/" element={
-                user ? <Navigate to={getDashboardPath(user.role)} /> : 
-                <LandingPage onGetStarted={() => navigate('/login')} onVolunteerJoin={() => navigate('/volunteer-register')} />
+                <LandingPage 
+                    onGetStarted={handleGetStarted} 
+                    onVolunteerJoin={() => navigate('/volunteer-register')} 
+                />
             } />
 
-            {/* LOGIN ROUTE */}
+            {/* LOGIN ROUTE - Redirects to dashboard if already logged in */}
             <Route path="/login" element={
                 user ? <Navigate to={getDashboardPath(user.role)} /> :
                 <Login onLogin={handleLoginSuccess} onBack={() => navigate('/')} onSignupClick={() => navigate('/register')} onVolunteerClick={() => navigate('/volunteer-register')} />
