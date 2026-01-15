@@ -2,16 +2,29 @@ const express = require('express');
 const router = express.Router();
 const Request = require('../models/Request');
 
-// GET REQUESTS
+// 1. GET ALL REQUESTS (For Users to track their specific ride history/status)
 router.get('/', async (req, res) => {
     try {
         const twentyFourHoursAgo = new Date(new Date().getTime() - (24 * 60 * 60 * 1000));
+        // Users need to see everything relevant to them
+        const requests = await Request.find({
+            createdAt: { $gte: twentyFourHoursAgo }
+        }).sort({ createdAt: -1 });
+        res.status(200).json(requests);
+    } catch (err) { res.status(500).json({ message: "Server Error" }); }
+});
+
+// ✅ 2. NEW: GET AVAILABLE REQUESTS (For Volunteers Only)
+router.get('/available', async (req, res) => {
+    try {
+        const thirtyMinutesAgo = new Date(new Date().getTime() - (30 * 60 * 1000));
         
-        // ✅ FIX: Added 'completed' to the list of allowed statuses
+        // Volunteers should ONLY see 'pending' requests that are recent
+        // We also want to see their own active rides ('accepted', 'in_progress')
         const requests = await Request.find({
             $or: [
-                { status: 'pending', createdAt: { $gte: twentyFourHoursAgo } },
-                { status: { $in: ['accepted', 'in_progress', 'completed'] } } 
+                { status: 'pending', createdAt: { $gte: thirtyMinutesAgo } },
+                { status: { $in: ['accepted', 'in_progress'] } } // To keep active ride on screen
             ]
         }).sort({ createdAt: -1 });
         
@@ -19,20 +32,18 @@ router.get('/', async (req, res) => {
     } catch (err) { res.status(500).json({ message: "Server Error" }); }
 });
 
+// ... (Keep existing POST, PUT, LEADERBOARD routes exactly as they are)
 // CREATE REQUEST
 router.post('/', async (req, res) => {
     try {
         const otp = Math.floor(1000 + Math.random() * 9000).toString();
-        const newRequest = new Request({
-            ...req.body,
-            pickupOTP: otp
-        });
+        const newRequest = new Request({ ...req.body, pickupOTP: otp });
         const savedRequest = await newRequest.save();
         res.status(201).json(savedRequest);
     } catch (err) { res.status(500).json({ message: err.message }); }
 });
 
-// UPDATE STATUS (Accept, Pickup, Complete, Cancel, Rate)
+// UPDATE STATUS
 router.put('/:id/:action', async (req, res) => {
     try {
         const { action } = req.params;
@@ -60,14 +71,11 @@ router.put('/:id/:action', async (req, res) => {
         else if (action === 'review' || action === 'rate') {
             request.rating = rating;
             request.review = review;
-            // Optionally save tip info if your schema supports it
         }
 
         await request.save();
         res.json(request);
-    } catch (err) { 
-        res.status(500).json({ message: err.message }); 
-    }
+    } catch (err) { res.status(500).json({ message: err.message }); }
 });
 
 // LEADERBOARD

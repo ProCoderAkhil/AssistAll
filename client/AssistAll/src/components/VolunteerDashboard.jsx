@@ -51,7 +51,7 @@ const VolunteerDashboard = ({ user, globalToast }) => {
   
   const [showOfflineModal, setShowOfflineModal] = useState(false);
   const [showOTPModal, setShowOTPModal] = useState(false);
-  const [showReportModal, setShowReportModal] = useState(false); // ✅ NEW: Report Modal State
+  const [showReportModal, setShowReportModal] = useState(false); 
   const [otpInput, setOtpInput] = useState("");
   const [reportReason, setReportReason] = useState("");
   const [toast, setToast] = useState(null);
@@ -94,40 +94,57 @@ const VolunteerDashboard = ({ user, globalToast }) => {
       window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, '_blank');
   };
 
-  // --- API POLLING ---
+  // --- API POLLING (UPDATED WITH FIX) ---
   const fetchRequests = async () => { 
     if (!isOnline || isProcessing.current) return; 
+
     try { 
-      const res = await fetch(`${DEPLOYED_API_URL}/api/requests?t=${Date.now()}`); 
+      // ✅ FIX: Using the /available endpoint to ensure volunteers see correct pending data
+      const res = await fetch(`${DEPLOYED_API_URL}/api/requests/available?t=${Date.now()}`); 
       if (res.ok) { 
           const data = await res.json(); 
           if(Array.isArray(data)) { 
-            const myActive = data.find(r => r.volunteerId === user._id && (r.status === 'accepted' || r.status === 'in_progress'));
+            // 1. Check if I have an active job (Accepted or In Progress)
+            const myActive = data.find(r => 
+                r.volunteerId === user._id && 
+                (r.status === 'accepted' || r.status === 'in_progress')
+            );
+            
             setActiveJob(myActive || null);
 
+            // 2. If no active job, filter and show pending requests
             if (!myActive) {
                 const now = new Date();
                 const validRequests = data.filter(r => {
+                    // Filter out my own dismissed rides
                     if (dismissedIds.includes(r._id)) return false; 
+                    // Only show pending
                     if (r.status !== 'pending') return false;
+                    
+                    // Double check time (safety - 30 mins expiry)
                     const reqTime = new Date(r.createdAt);
                     const diffMins = Math.round(((now - reqTime) % 86400000) / 60000);
                     return diffMins < 30; 
                 });
                 
+                // Prevent infinite re-renders by comparing JSON
                 setRequests(prev => {
                     if (JSON.stringify(prev) !== JSON.stringify(validRequests)) return validRequests;
                     return prev;
                 });
                 
+                // Calculate potential earnings
                 const potential = validRequests.reduce((acc, curr) => acc + (curr.price || 150), 0);
                 setFinancials(prev => ({ ...prev, potential }));
             } else {
+                // If I have an active job, clear the list of other requests
                 setRequests([]); 
             }
           } 
       } 
-    } catch (err) {} 
+    } catch (err) {
+        // Silent error catch for polling
+    } 
   };
 
   const fetchLeaderboard = async () => {
@@ -230,7 +247,7 @@ const VolunteerDashboard = ({ user, globalToast }) => {
     if (!isOnline) return <div className="h-full flex flex-col items-center justify-center p-6 text-center pt-20 bg-[#050505]"><div className="relative mb-10 group cursor-pointer" onClick={() => setIsOnline(true)}><div className="absolute inset-0 bg-green-500/20 rounded-full blur-[60px] animate-pulse"></div><div className="w-36 h-36 bg-[#121212] rounded-full flex items-center justify-center border-4 border-[#222] relative z-10 shadow-2xl"><Power size={48} className="text-neutral-600 group-hover:text-green-500 transition-colors" /></div></div><h2 className="text-3xl font-black text-white mb-3">You are Offline</h2><p className="text-neutral-500 mb-12">Tap to start shift.</p></div>;
     return (
         <div className="relative h-full w-full bg-[#050505]">
-            <div className="absolute inset-0 z-0"><iframe width="100%" height="100%" frameBorder="0" scrolling="no" src="https://www.openstreetmap.org/export/embed.html?bbox=76.51%2C9.58%2C76.54%2C9.60&amp;layer=mapnik&amp;marker=9.59%2C76.52" style={{ filter: 'grayscale(100%) invert(90%) contrast(120%)' }}></iframe></div>
+            <div className="absolute inset-0 z-0"><iframe width="100%" height="100%" frameBorder="0" scrolling="no" src="https://www.openstreetmap.org/export/embed.html?bbox=76.51%2C9.58%2C76.54%2C9.60&layer=mapnik&marker=9.59%2C76.52" style={{ filter: 'grayscale(100%) invert(90%) contrast(120%)' }}></iframe></div>
             
             <div className="absolute top-4 left-0 right-0 px-4 flex justify-between items-start z-10 pointer-events-none">
                 <div className="pointer-events-auto bg-[#0a0a0a]/90 backdrop-blur-md text-white px-5 py-2.5 rounded-full shadow-2xl flex items-center gap-4 border border-white/5 cursor-pointer hover:scale-105 transition active:scale-95" onClick={() => setActiveTab('pocket')}>
@@ -253,11 +270,15 @@ const VolunteerDashboard = ({ user, globalToast }) => {
                             </div>
                             <h2 className="text-2xl font-black text-gray-900">{activeJob.requesterName}</h2>
                         </div>
-                        {/* ✅ FEATURE: NAVIGATION BUTTON */}
+                        {/* NAVIGATION BUTTON */}
                         <button onClick={() => openMaps(activeJob.drop)} className="bg-blue-50 p-3 rounded-full hover:bg-blue-100 transition"><Navigation size={24} className="text-blue-600"/></button>
                     </div>
-                    <div className="flex gap-2 mb-4 bg-gray-50 p-3 rounded-xl items-center"><MapPin size={16} className="text-gray-400" /><p className="text-sm text-gray-600 font-bold">{activeJob.drop || "General Trip"}</p></div>
                     
+                    <div className="flex gap-2 mb-4 bg-gray-50 p-3 rounded-xl items-center">
+                        <MapPin size={16} className="text-gray-400" />
+                        <p className="text-sm text-gray-600 font-bold">{activeJob.drop || "General Trip"}</p>
+                    </div>
+
                     {activeJob.status === 'accepted' ? (
                         <div className="space-y-3">
                             <button onClick={() => handleAction(activeJob._id, 'pickup')} className="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl text-lg shadow-lg hover:bg-blue-700 active:scale-[0.98] transition-all flex justify-center items-center gap-2">Slide to Pickup <ArrowRight size={20}/></button>
@@ -275,21 +296,29 @@ const VolunteerDashboard = ({ user, globalToast }) => {
             {!activeJob && requests.map(req => (
                 <div key={req._id} className="absolute bottom-24 left-4 right-4 bg-[#121212] text-white p-6 rounded-[32px] shadow-2xl border border-white/10 z-20 animate-in slide-in-from-bottom duration-300">
                     <div className="flex justify-between items-center mb-4"><div className="bg-green-500/10 text-green-400 px-3 py-1 rounded-lg text-[10px] font-black uppercase border border-green-500/20 flex items-center gap-1"><Zap size={12} fill="currentColor"/> High Pay</div><span className="text-neutral-400 text-xs font-bold">Nearby</span></div>
-                    <div className="flex justify-between items-end mb-6"><div><p className="text-neutral-500 text-[10px] uppercase font-bold mb-1 tracking-wider">PASSENGER</p><h3 className="text-2xl font-bold">{req.requesterName}</h3><div className="flex items-center gap-1 mt-1 text-gray-400 text-xs"><MapPin size={12}/> <span className="truncate max-w-[150px]">{req.drop || "General Trip"}</span></div></div><div className="text-right"><p className="text-3xl font-black text-white">₹{req.price || 150}</p><p className="text-neutral-500 text-xs font-bold tracking-wider">ESTIMATED</p></div></div>
-                    <div className="flex gap-3"><button onClick={(e) => { e.stopPropagation(); setDismissedIds(prev => [...prev, req._id]); setRequests(prev => prev.filter(r => r._id !== req._id)); }} className="w-16 bg-[#222] text-white rounded-2xl flex items-center justify-center hover:bg-red-900/30 hover:text-red-500 transition border border-white/5 active:scale-95"><X size={24} /></button><button onClick={() => handleAction(req._id, 'accept')} className="flex-1 bg-white text-black font-black py-4 rounded-2xl text-lg shadow-[0_0_30px_rgba(255,255,255,0.2)] active:scale-[0.98] transition-all hover:bg-gray-200">Tap to Accept</button></div>
+                    <div className="flex justify-between items-end mb-6">
+                        <div><p className="text-neutral-500 text-[10px] uppercase font-bold mb-1 tracking-wider">PASSENGER</p><h3 className="text-2xl font-bold">{req.requesterName}</h3><div className="flex items-center gap-1 mt-1 text-gray-400 text-xs"><MapPin size={12}/> <span className="truncate max-w-[150px]">{req.drop || "General Trip"}</span></div></div>
+                        <div className="text-right"><p className="text-3xl font-black text-white">₹{req.price || 150}</p><p className="text-neutral-500 text-xs font-bold tracking-wider">ESTIMATED</p></div>
+                    </div>
+                    <div className="flex gap-3">
+                        <button onClick={(e) => { e.stopPropagation(); setDismissedIds(prev => [...prev, req._id]); setRequests(prev => prev.filter(r => r._id !== req._id)); }} className="w-16 bg-[#222] text-white rounded-2xl flex items-center justify-center hover:bg-red-900/30 hover:text-red-500 transition border border-white/5 active:scale-95"><X size={24} /></button>
+                        <button onClick={() => handleAction(req._id, 'accept')} className="flex-1 bg-white text-black font-black py-4 rounded-2xl text-lg shadow-[0_0_30px_rgba(255,255,255,0.2)] active:scale-[0.98] transition-all hover:bg-gray-200">Tap to Accept</button>
+                    </div>
                 </div>
             ))}
         </div>
     );
   };
 
-  const LeaderboardView = () => (<div className="p-6 pt-24 h-full bg-[#050505] animate-in fade-in overflow-y-auto pb-32"><div className="text-center mb-8"><div className="w-20 h-20 bg-yellow-500/10 rounded-full flex items-center justify-center mx-auto mb-4 border border-yellow-500/30"><Trophy size={40} className="text-yellow-500"/></div><h2 className="text-3xl font-black text-white">Top Helpers</h2></div><div className="space-y-4">{leaderboard.map((vol, index) => (<div key={index} className={`flex items-center p-4 rounded-2xl border ${index===0 ? 'bg-yellow-900/10 border-yellow-500/30' : 'bg-[#121212] border-white/5'}`}><div className={`w-8 h-8 rounded-full flex items-center justify-center font-black mr-4 ${index===0 ? 'bg-yellow-500 text-black' : 'bg-neutral-800 text-neutral-400'}`}>{index+1}</div><div className="flex-1"><h4 className="font-bold text-white">{vol._id}</h4></div><div className="text-right"><p className="text-green-400 font-bold">₹{vol.earnings}</p></div></div>))}</div></div>);
-  
   const PocketView = () => (
     <div className="p-6 pt-24 pb-32 h-full bg-[#050505] animate-in fade-in overflow-y-auto">
-        <div className="bg-gradient-to-br from-[#121212] to-[#0a0a0a] rounded-[32px] p-8 border border-white/5 text-center shadow-2xl mb-8"><p className="text-neutral-500 text-xs font-black uppercase tracking-widest mb-1">Available Balance</p><h2 className="text-5xl font-black text-white flex items-start justify-center gap-1"><span className="text-2xl mt-2 text-green-500">₹</span>{financials.total}</h2><button onClick={handleWithdraw} className="mt-6 w-full bg-white text-black font-black py-4 rounded-2xl flex items-center justify-center gap-2"><ArrowRight size={20} className="-rotate-45"/> Withdraw</button></div>
+        <div className="bg-gradient-to-br from-[#121212] to-[#0a0a0a] rounded-[32px] p-8 border border-white/5 text-center shadow-2xl mb-8">
+             <p className="text-neutral-500 text-xs font-black uppercase tracking-widest mb-1">Available Balance</p>
+             <h2 className="text-5xl font-black text-white flex items-start justify-center gap-1"><span className="text-2xl mt-2 text-green-500">₹</span>{financials.total}</h2>
+             <button onClick={handleWithdraw} disabled={financials.total === 0 || isWithdrawing} className="mt-6 w-full bg-white text-black font-black py-4 rounded-2xl flex items-center justify-center gap-2 hover:bg-gray-200">{isWithdrawing ? <Loader2 className="animate-spin"/> : "Withdraw"}</button>
+        </div>
         
-        {/* ✅ FEATURE: RIDE HISTORY */}
+        {/* RIDE HISTORY */}
         <div className="mb-8">
             <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2"><Clock size={18} className="text-neutral-500"/> Ride History</h3>
             <div className="space-y-3">
@@ -307,19 +336,21 @@ const VolunteerDashboard = ({ user, globalToast }) => {
     </div>
   );
 
-  const GigsView = () => (<div className="p-6 pt-24 pb-32 h-full bg-[#050505] animate-in fade-in overflow-y-auto"><div className="bg-gradient-to-r from-purple-900/40 to-indigo-900/40 rounded-[32px] p-6 relative overflow-hidden border border-purple-500/20 mb-8"><div className="relative z-10"><div className="flex items-center gap-2 mb-3"><span className="bg-white/10 text-white text-[10px] font-black px-2 py-1 rounded backdrop-blur uppercase tracking-wider border border-white/10">3 DAY STREAK</span></div><h2 className="text-2xl font-black text-white mb-2">Complete 3 Rides</h2><p className="text-purple-200 text-sm mb-6 font-medium">Finish 3 more trips by 10 PM to unlock <span className="text-white font-bold">₹200 Bonus</span>.</p></div><Zap size={100} className="absolute -right-6 -bottom-6 text-purple-500/10 rotate-12"/></div><div className="space-y-3">{gigsList.map((item) => (<div key={item.id} className={`flex items-center justify-between p-4 rounded-2xl border transition-all cursor-pointer active:scale-[0.98] ${item.status === 'locked' ? 'bg-[#121212] border-white/5 opacity-50' : 'bg-[#1a1a1a] border-white/10 hover:border-white/20'}`}><div className="flex items-center gap-4"><div className={`w-12 h-12 rounded-xl flex items-center justify-center font-bold text-sm ${item.isSpecial ? 'bg-green-600 text-black' : 'bg-[#222] text-neutral-400'}`}>{item.date}</div><div><p className="text-white font-bold text-lg">{item.day}</p><p className="text-neutral-500 text-xs font-bold uppercase tracking-wide">{item.status}</p></div></div>{item.earnings && <div className="text-right"><p className="text-green-400 font-black">{item.earnings}</p></div>}</div>))}</div></div>);
-  const BazaarView = () => (<div className="p-6 pt-24 pb-32 h-full bg-[#050505] animate-in fade-in overflow-y-auto"><div className="flex justify-between items-center mb-8"><h2 className="text-2xl font-black text-white">Partner Bazaar</h2></div><div className="space-y-4">{bazaarList.map(item => (<div key={item.id} className={`bg-[#121212] p-5 rounded-[24px] border border-white/5 flex items-center justify-between transition group hover:border-white/10 ${item.type === 'active' ? 'opacity-50' : ''}`}><div className="flex items-center gap-4"><div className={`p-4 rounded-2xl bg-[#1a1a1a]`}><item.icon size={24} className="text-white"/></div><div><div className={`text-[10px] font-black px-2 py-0.5 rounded w-fit mb-1 border ${item.color} uppercase tracking-wider`}>{item.title}</div><p className="text-neutral-400 text-sm font-medium">{item.desc}</p></div></div><button onClick={() => handleBazaarClick(item.id)} disabled={item.type === 'active'} className={`px-5 py-2.5 rounded-xl font-bold text-xs transition active:scale-95 ${item.type === 'active' ? 'bg-[#222] text-neutral-500' : 'bg-white text-black hover:bg-gray-200'}`}>{item.price}</button></div>))}</div></div>);
-  const ProfileView = () => (<div className="p-6 pt-24 h-full bg-[#050505] animate-in slide-in-from-left overflow-y-auto pb-32"><div className="flex items-center mb-8 bg-[#121212] p-6 rounded-[32px] border border-white/5"><div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center text-3xl font-black text-black mr-5">{user.name.charAt(0)}</div><div><h2 className="text-2xl font-black">{user.name}</h2><p className="text-green-500 text-sm font-bold">Verified Partner</p></div></div><button onClick={safeLogout} className="w-full bg-[#1a1a1a] text-red-500 border border-red-900/30 font-bold py-4 rounded-2xl hover:bg-red-900/10 transition flex items-center justify-center gap-2"><LogOut size={20}/> Sign Out</button></div>);
+  const LeaderboardView = () => (<div className="p-6 pt-24 h-full bg-[#050505] animate-in fade-in overflow-y-auto pb-32"><div className="text-center mb-8"><Trophy size={40} className="text-yellow-500 mx-auto mb-4"/><h2 className="text-3xl font-black text-white">Top Helpers</h2></div><div className="space-y-4">{leaderboard.map((vol, index) => (<div key={index} className="flex items-center p-4 rounded-2xl border bg-[#121212] border-white/5"><div className="w-8 h-8 rounded-full bg-neutral-800 text-neutral-400 flex items-center justify-center font-black mr-4">{index+1}</div><h4 className="font-bold text-white flex-1">{vol._id}</h4><p className="text-green-400 font-bold">₹{vol.earnings}</p></div>))}</div></div>);
+  const GigsView = () => (<div className="p-6 pt-24 pb-32 h-full bg-[#050505]"><h2 className="text-2xl font-black text-white mb-4">Gigs</h2><div className="space-y-3">{gigsList.map((item) => (<div key={item.id} className="flex items-center justify-between p-4 rounded-2xl border bg-[#1a1a1a] border-white/10"><p className="text-white font-bold">{item.day} - {item.date}</p><p className="text-green-400 font-bold">{item.earnings || "Locked"}</p></div>))}</div></div>);
+  const BazaarView = () => (<div className="p-6 pt-24 pb-32 h-full bg-[#050505]"><h2 className="text-2xl font-black text-white mb-4">Bazaar</h2><div className="space-y-4">{bazaarList.map(item => (<div key={item.id} className="bg-[#121212] p-5 rounded-[24px] border border-white/5 flex items-center justify-between"><p className="text-white font-bold">{item.title}</p><button className="px-5 py-2.5 rounded-xl font-bold text-xs bg-white text-black">{item.price}</button></div>))}</div></div>);
+  const ProfileView = () => (<div className="p-6 pt-24 h-full bg-[#050505]"><div className="flex items-center mb-8 bg-[#121212] p-6 rounded-[32px] border border-white/5"><div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center text-3xl font-black text-black mr-5">{user.name.charAt(0)}</div><div><h2 className="text-2xl font-black">{user.name}</h2><p className="text-green-500 text-sm font-bold">Verified Partner</p></div></div><button onClick={safeLogout} className="w-full bg-[#1a1a1a] text-red-500 border border-red-900/30 font-bold py-4 rounded-2xl flex items-center justify-center gap-2"><LogOut size={20}/> Sign Out</button></div>);
 
   return (
     <div className="h-screen w-full bg-[#050505] text-white font-sans flex flex-col overflow-hidden relative">
+      {/* Toast */}
       {toast && <div className={`absolute top-4 left-4 right-4 z-[6000] p-4 rounded-2xl shadow-2xl flex items-center animate-in slide-in-from-top ${toast.type === 'error' ? 'bg-red-900/90 border-red-500' : 'bg-[#222]/90 border-[#333] border'} border backdrop-blur-md`}>{toast.type === 'success' ? <CheckCircle className="text-green-500 mr-3"/> : <Receipt className="text-white mr-3"/>}<p className="font-bold text-sm">{toast.msg}</p></div>}
       
       {/* Offline Modal */}
       {showOfflineModal && (
         <div className="fixed inset-0 bg-black/90 z-[200] flex items-end justify-center animate-in fade-in duration-300 backdrop-blur-sm">
           <div className="bg-[#121212] w-full max-w-md rounded-t-[32px] p-8 border-t border-[#333] animate-in slide-in-from-bottom">
-            <h3 className="text-2xl font-black text-white mb-2 tracking-tight">End Shift?</h3>
+            <h3 className="text-2xl font-black text-white mb-2">End Shift?</h3>
             <div className="flex gap-4"><button onClick={() => { setIsOnline(false); setShowOfflineModal(false); }} className="flex-1 bg-red-600 text-white py-4 rounded-2xl font-bold">Go Offline</button><button onClick={() => setShowOfflineModal(false)} className="flex-1 bg-[#222] text-white py-4 rounded-2xl font-bold">Cancel</button></div>
           </div>
         </div>
@@ -338,7 +369,7 @@ const VolunteerDashboard = ({ user, globalToast }) => {
         </div>
       )}
 
-      {/* ✅ NEW: Report Modal */}
+      {/* Report Modal */}
       {showReportModal && (
         <div className="fixed inset-0 bg-black/90 z-[200] flex items-center justify-center animate-in fade-in duration-300 backdrop-blur-sm p-6">
           <div className="bg-[#121212] w-full max-w-sm rounded-[32px] p-8 border border-white/10 text-center shadow-2xl">
@@ -349,16 +380,26 @@ const VolunteerDashboard = ({ user, globalToast }) => {
         </div>
       )}
 
+      {/* Header */}
       <div className="absolute top-0 left-0 right-0 bg-[#050505]/80 backdrop-blur-md z-50 px-4 py-4 flex justify-between items-center border-b border-white/5">
         <div onClick={() => setShowOfflineModal(true)} className="flex items-center gap-2.5 px-4 py-2 rounded-full border border-green-500/30 text-green-500 cursor-pointer bg-green-500/5"><div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div><span className="text-[10px] font-black uppercase tracking-widest">ONLINE</span></div>
         <div className="flex gap-3 items-center"><button onClick={() => setActiveTab('profile')} className="w-10 h-10 bg-[#1a1a1a] rounded-full flex items-center justify-center text-sm font-bold border-2 border-[#222]">{user.name.charAt(0)}</button></div>
       </div>
       
-      <div className="flex-grow relative overflow-hidden">{activeTab === 'feed' && <FeedView />}{activeTab === 'pocket' && <PocketView />}{activeTab === 'leaderboard' && <LeaderboardView />}{activeTab === 'gigs' && <GigsView />}{activeTab === 'bazaar' && <BazaarView />}{activeTab === 'profile' && <ProfileView />}</div>
+      {/* Content */}
+      <div className="flex-grow relative overflow-hidden">
+          {activeTab === 'feed' && <FeedView />}
+          {activeTab === 'pocket' && <PocketView />}
+          {activeTab === 'leaderboard' && <LeaderboardView />}
+          {activeTab === 'gigs' && <GigsView />}
+          {activeTab === 'bazaar' && <BazaarView />}
+          {activeTab === 'profile' && <ProfileView />}
+      </div>
       
+      {/* Bottom Nav */}
       <div className="bg-[#050505]/95 border-t border-white/5 py-2 px-6 flex justify-between items-center z-50 absolute bottom-0 left-0 right-0 pb-6 backdrop-blur-xl">
         {[{id:'feed',icon:Home,l:'Feed'},{id:'pocket',icon:Wallet,l:'Pocket'},{id:'leaderboard',icon:Trophy,l:'Rank'},{id:'gigs',icon:Briefcase,l:'Gigs'},{id:'bazaar',icon:ShoppingBag,l:'Bazaar'}].map(item => (
-          <button key={item.id} onClick={() => setActiveTab(item.id)} className={`flex flex-col items-center gap-1.5 p-2 rounded-2xl transition-all duration-300 ${activeTab === item.id ? 'text-white' : 'text-neutral-600'}`}><item.icon size={26} strokeWidth={activeTab === item.id ? 2.5 : 2} /><span className="text-[9px] font-black tracking-widest uppercase">{item.l}</span></button>
+          <button key={item.id} onClick={() => setActiveTab(item.id)} className={`flex flex-col items-center gap-1.5 p-2 rounded-2xl transition-all duration-300 ${activeTab === item.id ? 'text-white' : 'text-neutral-600 hover:text-neutral-400'}`}><item.icon size={26} strokeWidth={activeTab === item.id ? 2.5 : 2} /><span className="text-[9px] font-black tracking-widest uppercase">{item.l}</span></button>
         ))}
       </div>
     </div>
