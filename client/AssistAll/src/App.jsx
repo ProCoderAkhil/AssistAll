@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { Routes, Route, useNavigate, useLocation, Navigate } from 'react-router-dom'; // Added Navigate
 import { Menu, Bell, Shield, AlertTriangle } from 'lucide-react';
 
 // Components
@@ -22,9 +22,8 @@ import LandingPage from './components/LandingPage';
 import AppLoader from './components/AppLoader'; 
 import SOSModal from './components/SOSModal'; 
 
-const DEPLOYED_API_URL = window.location.hostname === 'localhost' 
-    ? 'http://localhost:5000' 
-    : 'https://assistall-server.onrender.com';
+// ✅ FIX 1: Hardcoded Live URL to prevent local dev issues
+const DEPLOYED_API_URL = 'https://assistall-server.onrender.com';
 
 // --- ERROR BOUNDARY ---
 class ErrorBoundary extends React.Component {
@@ -60,16 +59,10 @@ function App() {
 
   const showToast = (msg, type = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 4000); };
 
+  // Fake loader for "App Initialization"
   useEffect(() => { setTimeout(() => setIsLoading(false), 2000); }, []);
 
-  useEffect(() => {
-      if (!isLoading && user && (location.pathname === '/login' || location.pathname === '/' || location.pathname === '/register')) {
-          if (user.role === 'admin') navigate('/admin');
-          else if (user.role === 'volunteer') navigate('/volunteer');
-          else navigate('/home');
-      }
-  }, [user, isLoading, location.pathname, navigate]);
-
+  // ✅ FIX 2: Polling logic for Active Rides
   useEffect(() => {
     if (!activeRequestId || !user) return;
     const interval = setInterval(async () => {
@@ -82,9 +75,9 @@ function App() {
                  if (myRequest.status === 'accepted' && step !== 'found') {
                     setAcceptedRequestData(myRequest); setStep('found'); showToast(`Volunteer Found!`, 'success');
                  } else if (myRequest.status === 'in_progress' && step !== 'in_progress') {
-                   setStep('in_progress'); showToast("Ride Started", 'info');
+                    setStep('in_progress'); showToast("Ride Started", 'info');
                  } else if (myRequest.status === 'completed' && step !== 'rating') {
-                   setStep('rating'); showToast("Ride Completed", 'success');
+                    setStep('rating'); showToast("Ride Completed", 'success');
                  }
               }
           }
@@ -93,16 +86,23 @@ function App() {
     return () => clearInterval(interval);
   }, [activeRequestId, step, user]);
 
+  // ✅ FIX 3: Centralized Login Handler
   const handleLoginSuccess = (userData, token) => {
       localStorage.setItem('user', JSON.stringify(userData));
-      localStorage.setItem('token', token);
+      if(token) localStorage.setItem('token', token);
       setUser(userData);
+      
+      // Redirect based on role immediately
       if(userData.role === 'volunteer') navigate('/volunteer');
       else if(userData.role === 'admin') navigate('/admin');
       else navigate('/home');
   };
 
-  const handleLogout = () => { localStorage.clear(); setUser(null); navigate('/'); };
+  const handleLogout = () => { 
+      localStorage.clear(); 
+      setUser(null); 
+      navigate('/'); 
+  };
 
   const handleFindVolunteer = async (bookingDetails) => { 
     setStep('searching'); 
@@ -112,8 +112,7 @@ function App() {
         body: JSON.stringify({
             requesterName: user.name, requesterId: user._id, 
             type: bookingDetails.type, 
-            price: 150, // Ensure price is sent
-            // ✅ FIX: Send 'drop' instead of 'dropOffLocation' to match Schema
+            price: 150, 
             drop: bookingDetails.dropOff, 
             pickup: "Current Location",
             location: { lat: 9.5916, lng: 76.5222 },
@@ -127,6 +126,13 @@ function App() {
   } catch (err) { showToast("Network Error", "error"); setStep('selecting'); }
   };
 
+  // Helper to determine where to redirect logged-in users
+  const getDashboardPath = (role) => {
+      if (role === 'volunteer') return '/volunteer';
+      if (role === 'admin') return '/admin';
+      return '/home';
+  };
+
   return (
     <ErrorBoundary>
       {isLoading ? <AppLoader /> : (
@@ -136,12 +142,25 @@ function App() {
           </div>
 
           <Routes>
-            <Route path="/" element={<LandingPage onGetStarted={() => navigate('/login')} onVolunteerJoin={() => navigate('/volunteer-register')} />} />
-            <Route path="/login" element={<Login onLogin={handleLoginSuccess} onBack={() => navigate('/')} onSignupClick={() => navigate('/register')} onVolunteerClick={() => navigate('/volunteer-register')} />} />
-            <Route path="/register" element={<UserSignup onRegister={(u, t) => handleLoginSuccess(u, t)} onBack={() => navigate('/')} />} />
-            <Route path="/volunteer-register" element={<VolunteerSignup onRegister={(u, t) => handleLoginSuccess(u, t)} onBack={() => navigate('/')} />} />
+            {/* ✅ ROOT ROUTE: If User exists -> Dashboard, Else -> Landing Page */}
+            <Route path="/" element={
+                user ? <Navigate to={getDashboardPath(user.role)} /> : 
+                <LandingPage onGetStarted={() => navigate('/login')} onVolunteerJoin={() => navigate('/volunteer-register')} />
+            } />
 
-            <Route path="/home" element={user && user.role === 'user' ? (
+            {/* LOGIN ROUTE */}
+            <Route path="/login" element={
+                user ? <Navigate to={getDashboardPath(user.role)} /> :
+                <Login onLogin={handleLoginSuccess} onBack={() => navigate('/')} onSignupClick={() => navigate('/register')} onVolunteerClick={() => navigate('/volunteer-register')} />
+            } />
+
+            {/* REGISTRATION ROUTES */}
+            <Route path="/register" element={<UserSignup onRegister={handleLoginSuccess} onBack={() => navigate('/')} />} />
+            <Route path="/volunteer-register" element={<VolunteerSignup onRegister={handleLoginSuccess} onBack={() => navigate('/')} />} />
+
+            {/* USER DASHBOARD (Protected) */}
+            <Route path="/home" element={
+                user && user.role === 'user' ? (
                 <>
                     <div className="absolute inset-0 z-0"><MapBackground activeRequest={acceptedRequestData} /></div>
                     <div className="absolute top-0 left-0 right-0 p-4 pt-10 z-20 flex justify-between items-start pointer-events-none">
@@ -159,12 +178,13 @@ function App() {
                     <BottomNav activeTab="home" onHomeClick={() => navigate('/home')} onProfileClick={() => navigate('/profile')} onActivityClick={() => navigate('/activity')} onSOSClick={() => setShowSOS(true)} />
                     <SOSModal isOpen={showSOS} onClose={() => setShowSOS(false)} onConfirm={() => { setShowSOS(false); showToast("SOS Alert Sent!", "error"); }} />
                 </>
-            ) : <Login onLogin={handleLoginSuccess} onBack={() => navigate('/')} />} />
+            ) : <Navigate to="/" />} />
 
-            <Route path="/profile" element={user ? <UserProfile user={user} onLogout={handleLogout} onBack={() => navigate('/home')} /> : <Login onLogin={handleLoginSuccess} onBack={() => navigate('/')} />} />
-            <Route path="/activity" element={user ? <div className="h-screen bg-[#050505] flex flex-col"><ActivityHistory user={user} onBack={() => navigate('/home')}/><BottomNav activeTab="activity" onHomeClick={() => navigate('/home')} onProfileClick={() => navigate('/profile')} onActivityClick={() => navigate('/activity')} onSOSClick={() => setShowSOS(true)} /></div> : <Login onLogin={handleLoginSuccess} onBack={() => navigate('/')} />} />
-            <Route path="/volunteer" element={user && user.role === 'volunteer' ? <VolunteerDashboard user={user} globalToast={showToast} /> : <Login onLogin={handleLoginSuccess} onBack={() => navigate('/')} />} />
-            <Route path="/admin" element={user && user.role === 'admin' ? <AdminPanel onLogout={handleLogout} /> : <Login onLogin={handleLoginSuccess} onBack={() => navigate('/')} />} />
+            {/* OTHER PROTECTED ROUTES */}
+            <Route path="/profile" element={user ? <UserProfile user={user} onLogout={handleLogout} onBack={() => navigate('/home')} /> : <Navigate to="/" />} />
+            <Route path="/activity" element={user ? <div className="h-screen bg-[#050505] flex flex-col"><ActivityHistory user={user} onBack={() => navigate('/home')}/><BottomNav activeTab="activity" onHomeClick={() => navigate('/home')} onProfileClick={() => navigate('/profile')} onActivityClick={() => navigate('/activity')} onSOSClick={() => setShowSOS(true)} /></div> : <Navigate to="/" />} />
+            <Route path="/volunteer" element={user && user.role === 'volunteer' ? <VolunteerDashboard user={user} globalToast={showToast} /> : <Navigate to="/" />} />
+            <Route path="/admin" element={user && user.role === 'admin' ? <AdminPanel onLogout={handleLogout} /> : <Navigate to="/" />} />
           </Routes>
         </div>
       )}
