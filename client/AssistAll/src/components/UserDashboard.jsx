@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-    Menu, Bell, CheckCircle, Navigation, Star, Phone, Shield, User, Share2, 
-    MessageSquare, ChevronUp, Loader2, X, Stethoscope, FileText, MapPin, 
+    Menu, Bell, CheckCircle, Navigation, Star, Phone, Shield, Share2, 
+    MessageSquare, Loader2, X, Stethoscope, MapPin, 
     CreditCard, Banknote, ShieldCheck, AlertTriangle 
 } from 'lucide-react';
 import ServiceSelector from './ServiceSelector';
@@ -9,7 +9,7 @@ import ServiceSelector from './ServiceSelector';
 const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:5000' : 'https://assistall-server.onrender.com';
 
 // ==========================================
-// 1. RATE & TIP COMPONENT (Payment & Review)
+// 1. RATE & TIP COMPONENT
 // ==========================================
 const RateAndTip = ({ requestData, onSkip, onSubmit }) => {
     const [rating, setRating] = useState(5);
@@ -28,12 +28,8 @@ const RateAndTip = ({ requestData, onSkip, onSubmit }) => {
             });
             alert("Thank you! Feedback Submitted.");
             onSubmit(); 
-        } catch (err) { 
-            console.error(err);
-            onSubmit(); 
-        } finally { 
-            setLoading(false); 
-        }
+        } catch (err) { onSubmit(); } 
+        finally { setLoading(false); }
     };
 
     const handleCashPayment = () => {
@@ -265,6 +261,7 @@ const UserDashboard = () => {
 
         const pollInterval = setInterval(async () => {
             try {
+                // Polling ALL requests (including completed ones thanks to backend fix)
                 const res = await fetch(`${API_BASE}/api/requests?t=${Date.now()}`);
                 if (res.ok) {
                     const data = await res.json();
@@ -320,7 +317,7 @@ const UserDashboard = () => {
     return (
         <div className="h-screen bg-neutral-100 text-black font-sans flex flex-col relative overflow-hidden">
             
-            {/* Map (Hidden if Completed to force focus on Rating) */}
+            {/* Map (Hidden ONLY if Completed) */}
             {viewState !== 'completed' && (
                 <div className="absolute inset-0 z-0">
                     <iframe width="100%" height="100%" frameBorder="0" scrolling="no" src="https://www.openstreetmap.org/export/embed.html?bbox=76.51%2C9.58%2C76.54%2C9.60&amp;layer=mapnik&amp;marker=9.59%2C76.52" style={{ filter: 'grayscale(100%) invert(90%) contrast(120%)' }}></iframe>
