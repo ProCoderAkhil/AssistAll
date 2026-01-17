@@ -133,7 +133,7 @@ function App() {
       return '/home';
   };
 
-  // Handler for Landing Page buttons
+  // ✅ FIX: Correct Handlers for Landing Page Buttons
   const handleGetStarted = () => {
       if (user) {
           navigate(getDashboardPath(user.role));
@@ -151,15 +151,16 @@ function App() {
           </div>
 
           <Routes>
-            {/* ✅ FIXED: Always show Landing Page at root */}
+            {/* ✅ ROOT ROUTE: Always shows Landing Page */}
             <Route path="/" element={
                 <LandingPage 
-                    onGetStarted={handleGetStarted} 
-                    onVolunteerJoin={() => navigate('/volunteer-register')} 
+                    onLogin={() => navigate('/login')}          // Login Button -> Login Page
+                    onGetStarted={handleGetStarted}             // Get Started -> Login or Dashboard
+                    onVolunteerJoin={() => navigate('/volunteer-register')} // Volunteer -> Registration
                 />
             } />
 
-            {/* LOGIN ROUTE - Redirects to dashboard if already logged in */}
+            {/* LOGIN ROUTE */}
             <Route path="/login" element={
                 user ? <Navigate to={getDashboardPath(user.role)} /> :
                 <Login onLogin={handleLoginSuccess} onBack={() => navigate('/')} onSignupClick={() => navigate('/register')} onVolunteerClick={() => navigate('/volunteer-register')} />

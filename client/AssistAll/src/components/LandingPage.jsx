@@ -1,19 +1,16 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { 
-  ArrowRight, ChevronDown, Car, Shield, Heart, MapPin, 
-  Users, Activity, Phone, Mail, Globe, Star, CheckCircle, 
-  Zap, Target, Clock, ChevronRight, HelpCircle, Plus, Send, MessageSquare,
-  FileText, Video, Award, Stethoscope, Menu, X, ShieldCheck
+  ArrowRight, ChevronDown, Car, Heart, Activity, Phone, Mail, 
+  Send, MessageSquare, FileText, Video, Menu, X, ShieldCheck
 } from 'lucide-react';
 
 const logoImg = "/logo.png"; 
 
-const LandingPage = ({ onGetStarted, onVolunteerJoin }) => {
+// ✅ PROPS: Added onLogin for explicit login button behavior
+const LandingPage = ({ onLogin, onGetStarted, onVolunteerJoin }) => {
   const [scrollY, setScrollY] = useState(0);
   const [activeFaq, setActiveFaq] = useState(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  
-  // ✅ FIX: Ref for the scrollable container
   const containerRef = useRef(null);
 
   const navItems = [
@@ -30,39 +27,26 @@ const LandingPage = ({ onGetStarted, onVolunteerJoin }) => {
             setScrollY(containerRef.current.scrollTop);
         }
     };
-
     const container = containerRef.current;
-    if (container) {
-        container.addEventListener('scroll', handleScroll);
-    }
-    return () => {
-        if (container) container.removeEventListener('scroll', handleScroll);
-    };
+    if (container) container.addEventListener('scroll', handleScroll);
+    return () => { if (container) container.removeEventListener('scroll', handleScroll); };
   }, []);
 
-  // ✅ FIX: Scroll the specific container, not the window
   const smoothScroll = (id) => {
     setIsMobileMenuOpen(false); 
     const element = document.getElementById(id);
     const container = containerRef.current;
-
     if (element && container) {
-        // Calculate position relative to the container
-        const offset = 80; // Navbar height
+        const offset = 80; 
         const elementTop = element.offsetTop;
-        
-        container.scrollTo({
-            top: elementTop - offset,
-            behavior: 'smooth'
-        });
+        container.scrollTo({ top: elementTop - offset, behavior: 'smooth' });
     }
   };
 
   const toggleFaq = (index) => setActiveFaq(activeFaq === index ? null : index);
-  const handleContactSubmit = (e) => { e.preventDefault(); alert("Message Sent! We will contact you shortly."); };
+  const handleContactSubmit = (e) => { e.preventDefault(); alert("Message Sent!"); };
 
   return (
-    // ✅ FIX: Added h-screen and overflow-y-auto to allow scrolling within the App's fixed layout
     <div ref={containerRef} className="h-screen w-full bg-black text-white font-sans overflow-y-auto overflow-x-hidden selection:bg-green-500 selection:text-black relative scroll-smooth">
       
       {/* Background */}
@@ -85,8 +69,11 @@ const LandingPage = ({ onGetStarted, onVolunteerJoin }) => {
         </div>
 
         <div className="hidden md:flex gap-3">
-            <button onClick={onGetStarted} className="px-5 py-2 text-sm font-bold text-white hover:text-green-400 transition">Log In</button>
-            <button onClick={onVolunteerJoin} className="bg-white text-black px-6 py-2.5 rounded-full text-sm font-bold hover:bg-gray-200 transition transform hover:scale-105">Get Started</button>
+            {/* ✅ FIX: Button explicitly calls onLogin */}
+            <button onClick={onLogin} className="px-5 py-2 text-sm font-bold text-white hover:text-green-400 transition">Log In</button>
+            
+            {/* ✅ FIX: 'Get Started' now calls onGetStarted (User Flow), NOT onVolunteerJoin */}
+            <button onClick={onGetStarted} className="bg-white text-black px-6 py-2.5 rounded-full text-sm font-bold hover:bg-gray-200 transition transform hover:scale-105">Get Started</button>
         </div>
 
         <button className="md:hidden p-2 text-white" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
@@ -94,14 +81,15 @@ const LandingPage = ({ onGetStarted, onVolunteerJoin }) => {
         </button>
       </nav>
 
+      {/* Mobile Menu */}
       {isMobileMenuOpen && (
           <div className="fixed inset-0 z-40 bg-black/95 backdrop-blur-xl pt-24 px-6 flex flex-col gap-6 md:hidden animate-in slide-in-from-top-10">
               {navItems.map((item) => (
                   <button key={item.name} onClick={() => smoothScroll(item.id)} className="text-2xl font-bold text-left text-gray-300 hover:text-white border-b border-white/10 pb-4">{item.name}</button>
               ))}
               <div className="flex flex-col gap-4 mt-4">
-                  <button onClick={onGetStarted} className="w-full bg-[#1a1a1a] text-white py-4 rounded-xl font-bold border border-white/10">Log In</button>
-                  <button onClick={onVolunteerJoin} className="w-full bg-green-600 text-black py-4 rounded-xl font-bold">Get Started</button>
+                  <button onClick={onLogin} className="w-full bg-[#1a1a1a] text-white py-4 rounded-xl font-bold border border-white/10">Log In</button>
+                  <button onClick={onGetStarted} className="w-full bg-green-600 text-black py-4 rounded-xl font-bold">Get Started</button>
               </div>
           </div>
       )}
@@ -121,9 +109,11 @@ const LandingPage = ({ onGetStarted, onVolunteerJoin }) => {
                 The community-powered mobility platform. Connect with verified neighbors for rides, help, and companionship.
             </p>
             <div className="flex flex-col md:flex-row gap-4 justify-center items-center w-full">
+                {/* ✅ FIX: Hero Button calls onGetStarted (User Flow) */}
                 <button onClick={onGetStarted} className="w-full md:w-auto px-8 py-4 bg-green-600 text-black rounded-full font-bold text-lg flex items-center justify-center hover:bg-green-500 hover:scale-105 transition group">
                     Find Help Now <ArrowRight className="ml-2 group-hover:translate-x-1 transition-transform"/>
                 </button>
+                {/* ✅ FIX: Volunteer Button explicitly calls onVolunteerJoin */}
                 <button onClick={onVolunteerJoin} className="w-full md:w-auto px-8 py-4 bg-transparent border border-white/20 text-white rounded-full font-bold text-lg hover:bg-white/5 transition flex items-center justify-center gap-2">
                     <Heart size={20} className="text-red-500"/> Volunteer
                 </button>
@@ -131,7 +121,7 @@ const LandingPage = ({ onGetStarted, onVolunteerJoin }) => {
         </div>
       </section>
 
-      {/* Services */}
+      {/* Services Section */}
       <section id="services" className="py-24 px-6 relative z-10 bg-neutral-950">
           <div className="max-w-6xl mx-auto">
               <div className="mb-16">
@@ -159,7 +149,7 @@ const LandingPage = ({ onGetStarted, onVolunteerJoin }) => {
           </div>
       </section>
 
-      {/* Volunteer CTA */}
+      {/* Volunteer Section */}
       <section id="volunteer" className="py-24 px-6 bg-neutral-900 border-y border-white/5 relative overflow-hidden">
           <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-16 items-center relative z-10">
               <div>
@@ -170,6 +160,7 @@ const LandingPage = ({ onGetStarted, onVolunteerJoin }) => {
                       <div className="flex gap-5"><div className="w-14 h-14 bg-blue-900/20 rounded-2xl flex items-center justify-center text-blue-500 shrink-0 border border-blue-500/20"><FileText size={28}/></div><div><h4 className="text-white font-bold text-xl">1. Verification</h4><p className="text-gray-400 text-sm mt-1">Government ID check.</p></div></div>
                       <div className="flex gap-5"><div className="w-14 h-14 bg-purple-900/20 rounded-2xl flex items-center justify-center text-purple-500 shrink-0 border border-purple-500/20"><Video size={28}/></div><div><h4 className="text-white font-bold text-xl">2. Interview</h4><p className="text-gray-400 text-sm mt-1">Live video screening.</p></div></div>
                   </div>
+                  {/* ✅ FIX: Volunteer Application Button */}
                   <button onClick={onVolunteerJoin} className="mt-12 bg-white text-black px-10 py-4 rounded-full font-bold text-lg hover:bg-gray-200 transition flex items-center gap-2 group">Apply Now <ChevronRight className="group-hover:translate-x-1 transition"/></button>
               </div>
               <div className="relative flex justify-center">
