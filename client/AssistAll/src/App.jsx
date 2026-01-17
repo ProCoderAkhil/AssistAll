@@ -35,8 +35,7 @@ class ErrorBoundary extends React.Component {
         <div className="h-screen bg-black flex flex-col items-center justify-center text-white p-6 text-center font-sans">
           <div className="p-6 bg-red-900/20 rounded-full mb-6"><AlertTriangle size={48} className="text-red-500"/></div>
           <h1 className="text-2xl font-black mb-2">System Malfunction</h1>
-          <p className="text-gray-500 mb-6">Something went wrong. Please reset the app.</p>
-          <button onClick={() => { localStorage.clear(); window.location.href = '/'; }} className="bg-white text-black px-8 py-3 rounded-full font-bold">Hard Reset</button>
+          <button onClick={() => { localStorage.clear(); window.location.href = '/'; }} className="bg-white text-black px-8 py-3 rounded-full font-bold mt-6">Hard Reset</button>
         </div>
       );
     }
@@ -62,7 +61,7 @@ function App() {
   // Fake loader for "App Initialization"
   useEffect(() => { setTimeout(() => setIsLoading(false), 2000); }, []);
 
-  // ✅ FIX: Safer Polling Logic (Prevents Crash)
+  // Polling logic for Active Rides
   useEffect(() => {
     if (!activeRequestId || !user) return;
     const interval = setInterval(async () => {
@@ -70,7 +69,6 @@ function App() {
           const res = await fetch(`${DEPLOYED_API_URL}/api/requests`);
           if(res.ok) {
               const data = await res.json();
-              // ✅ CRITICAL FIX: Check if data is array before finding
               if (Array.isArray(data)) {
                   const myRequest = data.find(r => r._id === activeRequestId);
                   if (myRequest) {
@@ -84,7 +82,7 @@ function App() {
                   }
               }
           }
-        } catch (err) { console.error("Polling error:", err); }
+        } catch (err) {}
     }, 2000);
     return () => clearInterval(interval);
   }, [activeRequestId, step, user]);
@@ -128,7 +126,6 @@ function App() {
   } catch (err) { showToast("Network Error", "error"); setStep('selecting'); }
   };
 
-  // Helper to determine where to redirect logged-in users
   const getDashboardPath = (role) => {
       if (role === 'volunteer') return '/volunteer';
       if (role === 'admin') return '/admin';
@@ -144,16 +141,15 @@ function App() {
           </div>
 
           <Routes>
-            {/* ✅ ROOT ROUTE: Landing Page */}
+            {/* ✅ FIXED: Pass 3 explicit functions to avoid confusion */}
             <Route path="/" element={
                 <LandingPage 
-                    onLogin={() => navigate('/login')}          
-                    onGetStarted={() => navigate('/register')} // Get Started -> User Signup
-                    onVolunteerJoin={() => navigate('/volunteer-register')} 
+                    onLogin={() => navigate('/login')}              // Goes to Login
+                    onUserSignup={() => navigate('/register')}      // Goes to User Signup
+                    onVolunteerSignup={() => navigate('/volunteer-register')} // Goes to Volunteer Signup
                 />
             } />
 
-            {/* AUTH ROUTES */}
             <Route path="/login" element={
                 user ? <Navigate to={getDashboardPath(user.role)} /> :
                 <Login onLogin={handleLoginSuccess} onBack={() => navigate('/')} onSignupClick={() => navigate('/register')} onVolunteerClick={() => navigate('/volunteer-register')} />
@@ -162,7 +158,6 @@ function App() {
             <Route path="/register" element={<UserSignup onRegister={handleLoginSuccess} onBack={() => navigate('/')} />} />
             <Route path="/volunteer-register" element={<VolunteerSignup onRegister={handleLoginSuccess} onBack={() => navigate('/')} />} />
 
-            {/* DASHBOARDS */}
             <Route path="/home" element={user && user.role === 'user' ? (
                 <>
                     <div className="absolute inset-0 z-0"><MapBackground activeRequest={acceptedRequestData} /></div>
