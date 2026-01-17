@@ -35,7 +35,8 @@ class ErrorBoundary extends React.Component {
         <div className="h-screen bg-black flex flex-col items-center justify-center text-white p-6 text-center font-sans">
           <div className="p-6 bg-red-900/20 rounded-full mb-6"><AlertTriangle size={48} className="text-red-500"/></div>
           <h1 className="text-2xl font-black mb-2">System Malfunction</h1>
-          <button onClick={() => { localStorage.clear(); window.location.href = '/'; }} className="bg-white text-black px-8 py-3 rounded-full font-bold mt-6">Hard Reset</button>
+          <p className="text-gray-500 mb-6">Something went wrong. Please reset the app.</p>
+          <button onClick={() => { localStorage.clear(); window.location.href = '/'; }} className="bg-white text-black px-8 py-3 rounded-full font-bold">Hard Reset</button>
         </div>
       );
     }
@@ -55,14 +56,13 @@ function App() {
   const [showSOS, setShowSOS] = useState(false);
   const [toast, setToast] = useState(null); 
   const navigate = useNavigate();
-  const location = useLocation();
 
   const showToast = (msg, type = 'success') => { setToast({ msg, type }); setTimeout(() => setToast(null), 4000); };
 
   // Fake loader for "App Initialization"
   useEffect(() => { setTimeout(() => setIsLoading(false), 2000); }, []);
 
-  // Polling logic for Active Rides
+  // ✅ FIX: Safer Polling Logic (Prevents Crash)
   useEffect(() => {
     if (!activeRequestId || !user) return;
     const interval = setInterval(async () => {
@@ -70,18 +70,21 @@ function App() {
           const res = await fetch(`${DEPLOYED_API_URL}/api/requests`);
           if(res.ok) {
               const data = await res.json();
-              const myRequest = data.find(r => r._id === activeRequestId);
-              if (myRequest) {
-                 if (myRequest.status === 'accepted' && step !== 'found') {
-                    setAcceptedRequestData(myRequest); setStep('found'); showToast(`Volunteer Found!`, 'success');
-                 } else if (myRequest.status === 'in_progress' && step !== 'in_progress') {
-                    setStep('in_progress'); showToast("Ride Started", 'info');
-                 } else if (myRequest.status === 'completed' && step !== 'rating') {
-                    setStep('rating'); showToast("Ride Completed", 'success');
-                 }
+              // ✅ CRITICAL FIX: Check if data is array before finding
+              if (Array.isArray(data)) {
+                  const myRequest = data.find(r => r._id === activeRequestId);
+                  if (myRequest) {
+                     if (myRequest.status === 'accepted' && step !== 'found') {
+                        setAcceptedRequestData(myRequest); setStep('found'); showToast(`Volunteer Found!`, 'success');
+                     } else if (myRequest.status === 'in_progress' && step !== 'in_progress') {
+                        setStep('in_progress'); showToast("Ride Started", 'info');
+                     } else if (myRequest.status === 'completed' && step !== 'rating') {
+                        setStep('rating'); showToast("Ride Completed", 'success');
+                     }
+                  }
               }
           }
-        } catch (err) {}
+        } catch (err) { console.error("Polling error:", err); }
     }, 2000);
     return () => clearInterval(interval);
   }, [activeRequestId, step, user]);
@@ -92,7 +95,6 @@ function App() {
       if(token) localStorage.setItem('token', token);
       setUser(userData);
       
-      // Redirect based on role immediately
       if(userData.role === 'volunteer') navigate('/volunteer');
       else if(userData.role === 'admin') navigate('/admin');
       else navigate('/home');
@@ -133,15 +135,6 @@ function App() {
       return '/home';
   };
 
-  // ✅ FIX: Correct Handlers for Landing Page Buttons
-  const handleGetStarted = () => {
-      if (user) {
-          navigate(getDashboardPath(user.role));
-      } else {
-          navigate('/login');
-      }
-  };
-
   return (
     <ErrorBoundary>
       {isLoading ? <AppLoader /> : (
@@ -151,28 +144,26 @@ function App() {
           </div>
 
           <Routes>
-            {/* ✅ ROOT ROUTE: Always shows Landing Page */}
+            {/* ✅ ROOT ROUTE: Landing Page */}
             <Route path="/" element={
                 <LandingPage 
-                    onLogin={() => navigate('/login')}          // Login Button -> Login Page
-                    onGetStarted={handleGetStarted}             // Get Started -> Login or Dashboard
-                    onVolunteerJoin={() => navigate('/volunteer-register')} // Volunteer -> Registration
+                    onLogin={() => navigate('/login')}          
+                    onGetStarted={() => navigate('/register')} // Get Started -> User Signup
+                    onVolunteerJoin={() => navigate('/volunteer-register')} 
                 />
             } />
 
-            {/* LOGIN ROUTE */}
+            {/* AUTH ROUTES */}
             <Route path="/login" element={
                 user ? <Navigate to={getDashboardPath(user.role)} /> :
                 <Login onLogin={handleLoginSuccess} onBack={() => navigate('/')} onSignupClick={() => navigate('/register')} onVolunteerClick={() => navigate('/volunteer-register')} />
             } />
 
-            {/* REGISTRATION ROUTES */}
             <Route path="/register" element={<UserSignup onRegister={handleLoginSuccess} onBack={() => navigate('/')} />} />
             <Route path="/volunteer-register" element={<VolunteerSignup onRegister={handleLoginSuccess} onBack={() => navigate('/')} />} />
 
-            {/* USER DASHBOARD (Protected) */}
-            <Route path="/home" element={
-                user && user.role === 'user' ? (
+            {/* DASHBOARDS */}
+            <Route path="/home" element={user && user.role === 'user' ? (
                 <>
                     <div className="absolute inset-0 z-0"><MapBackground activeRequest={acceptedRequestData} /></div>
                     <div className="absolute top-0 left-0 right-0 p-4 pt-10 z-20 flex justify-between items-start pointer-events-none">
@@ -192,7 +183,6 @@ function App() {
                 </>
             ) : <Navigate to="/" />} />
 
-            {/* OTHER PROTECTED ROUTES */}
             <Route path="/profile" element={user ? <UserProfile user={user} onLogout={handleLogout} onBack={() => navigate('/home')} /> : <Navigate to="/" />} />
             <Route path="/activity" element={user ? <div className="h-screen bg-[#050505] flex flex-col"><ActivityHistory user={user} onBack={() => navigate('/home')}/><BottomNav activeTab="activity" onHomeClick={() => navigate('/home')} onProfileClick={() => navigate('/profile')} onActivityClick={() => navigate('/activity')} onSOSClick={() => setShowSOS(true)} /></div> : <Navigate to="/" />} />
             <Route path="/volunteer" element={user && user.role === 'volunteer' ? <VolunteerDashboard user={user} globalToast={showToast} /> : <Navigate to="/" />} />
